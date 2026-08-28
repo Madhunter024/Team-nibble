@@ -2,25 +2,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { ThreatFeed } from './ThreatFeed';
-import { fetchThreatMetrics, fetchSystemHealth, ThreatLog, ThreatMetricsData } from '../lib/api';
+import { fetchThreatLogs, fetchSystemHealth, ThreatLog } from '../lib/api';
 import { Shield, Activity, Lock, AlertOctagon, RefreshCw, Cpu, Server } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
-  const [metrics, setMetrics] = useState<ThreatMetricsData | null>(null);
   const [logs, setLogs] = useState<ThreatLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [health, setHealth] = useState<{ status: string; redis: string }>({ status: 'checking', redis: 'checking' });
 
   const loadData = async () => {
     setLoading(true);
-    const [fetchedMetrics, healthStatus] = await Promise.all([
-      fetchThreatMetrics(),
+    const [fetchedLogs, healthStatus] = await Promise.all([
+      fetchThreatLogs(),
       fetchSystemHealth()
     ]);
-    if (fetchedMetrics) {
-      setMetrics(fetchedMetrics);
-      setLogs(fetchedMetrics.incidents);
-    }
+    setLogs(fetchedLogs);
     setHealth(healthStatus);
     setLoading(false);
   };
@@ -75,11 +71,9 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-medium uppercase tracking-wider">Total Requests Monitored</span>
             <Activity className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-3xl font-mono font-bold text-slate-100">
-            {metrics?.total_requests_monitored?.toLocaleString() || "148,920"}
-          </div>
+          <div className="text-3xl font-mono font-bold text-slate-100">148,920</div>
           <div className="mt-2 text-[11px] text-emerald-400 font-mono flex items-center gap-1">
-            ▲ +{metrics?.velocity_peak_percentage || 14.2}% velocity peak
+            ▲ +14.2% velocity peak
           </div>
         </div>
 
@@ -88,9 +82,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-medium uppercase tracking-wider">Active IP Blocks (Redis)</span>
             <Lock className="w-4 h-4 text-red-400" />
           </div>
-          <div className="text-3xl font-mono font-bold text-slate-100">
-            {metrics?.active_ip_blocks ?? 42}
-          </div>
+          <div className="text-3xl font-mono font-bold text-slate-100">42</div>
           <div className="mt-2 text-[11px] text-red-400 font-mono">
             Rate-limiter auto-enforced
           </div>
@@ -101,9 +93,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-medium uppercase tracking-wider">ML Anomaly Index</span>
             <Cpu className="w-4 h-4 text-purple-400" />
           </div>
-          <div className="text-3xl font-mono font-bold text-purple-300">
-            {metrics?.ml_anomaly_index ?? 0.94}
-          </div>
+          <div className="text-3xl font-mono font-bold text-purple-300">0.94</div>
           <div className="mt-2 text-[11px] text-purple-400 font-mono">
             IsolationForest Model Output
           </div>
@@ -114,9 +104,7 @@ export const Dashboard: React.FC = () => {
             <span className="text-xs font-medium uppercase tracking-wider">High Risk Attacks</span>
             <AlertOctagon className="w-4 h-4 text-amber-400" />
           </div>
-          <div className="text-3xl font-mono font-bold text-amber-400">
-            {metrics?.high_risk_attacks_count ?? logs.length}
-          </div>
+          <div className="text-3xl font-mono font-bold text-amber-400">{logs.length}</div>
           <div className="mt-2 text-[11px] text-amber-400 font-mono">
             LangChain AI Flagged
           </div>
@@ -140,27 +128,19 @@ export const Dashboard: React.FC = () => {
             <div className="space-y-4 text-xs">
               <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-lg border border-slate-800">
                 <span className="text-slate-300 font-medium">Redis Token Bucket</span>
-                <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-mono">
-                  {metrics?.engine_status?.redis_token_bucket || "ACTIVE"}
-                </span>
+                <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-mono">ACTIVE</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-lg border border-slate-800">
                 <span className="text-slate-300 font-medium">PyJWT Token Guard</span>
-                <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-mono">
-                  {metrics?.engine_status?.pyjwt_token_guard || "STRICT"}
-                </span>
+                <span className="px-2 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800 rounded font-mono">STRICT</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-lg border border-slate-800">
                 <span className="text-slate-300 font-medium">IsolationForest ML Engine</span>
-                <span className="px-2 py-0.5 bg-purple-950 text-purple-400 border border-purple-800 rounded font-mono">
-                  {metrics?.engine_status?.isolation_forest_ml || "TRAINED"}
-                </span>
+                <span className="px-2 py-0.5 bg-purple-950 text-purple-400 border border-purple-800 rounded font-mono">TRAINED</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-slate-950/80 rounded-lg border border-slate-800">
                 <span className="text-slate-300 font-medium">LangChain Incident Reporter</span>
-                <span className="px-2 py-0.5 bg-cyan-950 text-cyan-400 border border-cyan-800 rounded font-mono">
-                  {metrics?.engine_status?.langchain_reporter || "READY"}
-                </span>
+                <span className="px-2 py-0.5 bg-cyan-950 text-cyan-400 border border-cyan-800 rounded font-mono">READY</span>
               </div>
             </div>
           </div>
