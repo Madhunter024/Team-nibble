@@ -1,10 +1,13 @@
 import os
 import sys
 import logging
+from datetime import timedelta
+from typing import Optional, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, status, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 import redis.asyncio as aioredis
 
 # Add project root and backend directory to sys.path
@@ -22,12 +25,22 @@ except ImportError:
 
 try:
     from backend.middleware.rate_limiter import RateLimitMiddleware
+    from backend.middleware.telemetry import TelemetryMiddleware
+    from backend.middleware.auth import create_access_token, verify_jwt_token
     from backend.middleware.redis_rate_limit import tracker_instance
     from backend.routes.dummy_api import router as dummy_router
+    from backend.routes.honeypot import router as honeypot_router
+    from backend.routes.targets import router as targets_router
+    from backend.routes.threats import router as threats_router
 except ImportError:
     from middleware.rate_limiter import RateLimitMiddleware
+    from middleware.telemetry import TelemetryMiddleware
+    from middleware.auth import create_access_token, verify_jwt_token
     from middleware.redis_rate_limit import tracker_instance
     from routes.dummy_api import router as dummy_router
+    from routes.honeypot import router as honeypot_router
+    from routes.targets import router as targets_router
+    from routes.threats import router as threats_router
 
 # Setup Logging
 logging.basicConfig(
@@ -35,6 +48,13 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("nibdefender.main")
+
+
+class TokenRequestPayload(BaseModel):
+    user_id: str = Field("user_123", example="user_123")
+    role: str = Field("admin", example="admin")
+    scopes: list[str] = Field(["read", "write"], example=["read", "write"])
+    expires_minutes: int = Field(15, example=15)
 
 
 @asynccontextmanager
@@ -86,11 +106,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Rate Limiting & Dynamic IP Blacklist Middleware globally
+# Register Telemetry & Rate Limiting Middlewares globally
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(TelemetryMiddleware)
 
 # Include Routers
 app.include_router(dummy_router)
+app.include_router(honeypot_router)
+app.include_router(targets_router)
+app.include_router(threats_router)
+
+
+@app.post("/api/auth/token")
+@app.post("/api/v1/auth/token")
+async def generate_mock_token(payload: TokenRequestPayload = Body(...)):
+    """
+    Utility route for generating signed mock JWT test tokens during development and testing.
+    """
+    token_data = {
+        "sub": payload.user_id,
+        "user_id": payload.user_id,
+        "role": payload.role,
+        "scopes": payload.scopes
+    }
+    access_token = create_access_token(
+        data=token_data,
+        expires_delta=timedelta(minutes=payload.expires_minutes)
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in_minutes": payload.expires_minutes
+    }
 
 
 @app.get("/api/threat-metrics")
