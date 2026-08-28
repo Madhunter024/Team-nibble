@@ -14,10 +14,11 @@ def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
     if api_key and api_key != "your_google_api_key_here":
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
-            from langchain.prompts import PromptTemplate
+            from langchain_core.prompts import PromptTemplate
+            from langchain_core.output_parsers import StrOutputParser # <-- NEW IMPORT
 
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-3.5-flash",
                 google_api_key=api_key,
                 temperature=0.2
             )
@@ -33,14 +34,17 @@ def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
                 Summary should highlight the threat impact and immediate mitigation status.
                 """
             )
-            chain = prompt | llm
-            result = chain.invoke({
+            
+            # Add StrOutputParser to the end of the chain
+            chain = prompt | llm | StrOutputParser() 
+            
+            # The result is now guaranteed to be a clean string
+            report_text = chain.invoke({
                 "ip": ip,
                 "attack_type": attack_type,
                 "raw_payload": raw_payload
-            })
+            }).strip()
             
-            report_text = str(result.content).strip()
             if report_text:
                 return report_text
         except Exception as e:
