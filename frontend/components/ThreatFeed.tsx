@@ -1,92 +1,189 @@
 "use client";
 
-import React from 'react';
-import { ThreatLog } from '../lib/api';
-import { ShieldAlert, ShieldX, AlertTriangle, Cpu, Terminal } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ThreatAlert } from '../lib/mockData';
+import { Search, Copy, Check, Clock } from 'lucide-react';
 
 interface ThreatFeedProps {
-  logs: ThreatLog[];
+  alerts: ThreatAlert[];
 }
 
-export const ThreatFeed: React.FC<ThreatFeedProps> = ({ logs }) => {
-  const getSeverityBadge = (severity: ThreatLog['severity']) => {
+export const ThreatFeed: React.FC<ThreatFeedProps> = ({ alerts = [] }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const matchesSeverity = severityFilter === 'ALL' || alert.severity === severityFilter;
+      const matchesSearch =
+        searchQuery === '' ||
+        alert.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        alert.id.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSeverity && matchesSearch;
+    });
+  }, [alerts, severityFilter, searchQuery]);
+
+  const handleCopy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const getSeverityBadge = (severity: ThreatAlert['severity']) => {
     switch (severity) {
-      case 'CRITICAL':
-        return 'bg-red-900/60 text-red-300 border-red-700/50';
       case 'HIGH':
-        return 'bg-orange-900/60 text-orange-300 border-orange-700/50';
+        return 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
       case 'MEDIUM':
-        return 'bg-yellow-900/60 text-yellow-300 border-yellow-700/50';
+        return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+      case 'LOW':
       default:
-        return 'bg-blue-900/60 text-blue-300 border-blue-700/50';
+        return 'bg-slate-800/80 text-slate-300 border border-slate-700/60';
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    if (!isMounted) {
+      try {
+        const d = new Date(timestamp);
+        return d.toISOString().slice(11, 19);
+      } catch {
+        return '--:--:--';
+      }
+    }
+    try {
+      return new Date(timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+    } catch {
+      return timestamp;
     }
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-2xl flex flex-col h-[520px]">
-      <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-red-950/80 border border-red-800/60 rounded-lg text-red-400 animate-pulse">
-            <ShieldAlert className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              Live Threat Feed & AI Incident Log
-            </h2>
-            <p className="text-xs text-slate-400">Powered by LangChain & OpenAI Incident Intelligence</p>
-          </div>
+    <div className="glass-panel p-6 shadow-sm flex flex-col h-[500px]">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/[0.06]">
+        <div>
+          <h3 className="text-base font-semibold text-slate-100 tracking-tight">
+            Recent Threats
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {alerts.length} events logged in active window
+          </p>
         </div>
-        <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-950/80 border border-emerald-800/60 text-emerald-400 text-xs font-mono rounded-full">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          REALTIME MONITORED
-        </span>
+
+        {/* Severity Filter */}
+        <div className="flex items-center gap-1 bg-slate-950/60 p-0.5 rounded-lg border border-white/[0.06] text-xs">
+          <button
+            onClick={() => setSeverityFilter('ALL')}
+            className={`px-2.5 py-1 rounded-md transition-colors text-xs ${
+              severityFilter === 'ALL' ? 'bg-slate-800 text-slate-100 font-medium' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setSeverityFilter('HIGH')}
+            className={`px-2.5 py-1 rounded-md transition-colors text-xs ${
+              severityFilter === 'HIGH' ? 'bg-rose-950/60 text-rose-300 font-medium border border-rose-800/40' : 'text-slate-400 hover:text-rose-400'
+            }`}
+          >
+            High
+          </button>
+          <button
+            onClick={() => setSeverityFilter('MEDIUM')}
+            className={`px-2.5 py-1 rounded-md transition-colors text-xs ${
+              severityFilter === 'MEDIUM' ? 'bg-amber-950/60 text-amber-300 font-medium border border-amber-800/40' : 'text-slate-400 hover:text-amber-400'
+            }`}
+          >
+            Med
+          </button>
+          <button
+            onClick={() => setSeverityFilter('LOW')}
+            className={`px-2.5 py-1 rounded-md transition-colors text-xs ${
+              severityFilter === 'LOW' ? 'bg-slate-800 text-slate-300 font-medium' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Low
+          </button>
+        </div>
       </div>
 
-      {/* Scrolling Container */}
-      <div className="flex-1 overflow-y-auto mt-4 pr-1 space-y-3 custom-scrollbar">
-        {logs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-2">
-            <Terminal className="w-8 h-8 stroke-1 text-slate-600" />
-            <p className="text-sm">No security incidents flagged in active window.</p>
+      {/* Search Input */}
+      <div className="relative my-3">
+        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        <input
+          type="text"
+          placeholder="Filter threats by keyword or IP..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-3 py-1.5 bg-slate-950/60 border border-white/[0.06] rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-700 transition"
+        />
+      </div>
+
+      {/* Threat List Feed */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+        {filteredAlerts.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-slate-500 text-xs font-mono">
+            No incidents found matching criteria.
           </div>
         ) : (
-          logs.map((log) => (
-            <div
-              key={log.id}
-              className="bg-slate-950/70 border border-slate-800/90 rounded-lg p-4 transition-all hover:border-slate-700 hover:bg-slate-950"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${getSeverityBadge(log.severity)}`}>
-                    {log.severity}
-                  </span>
-                  <span className="font-mono text-xs text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                    IP: {log.ip}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    {log.threatType}
-                  </span>
+          filteredAlerts.map((alert) => {
+            const timeStr = formatTimestamp(alert.timestamp);
+
+            return (
+              <div
+                key={alert.id}
+                className="bg-slate-950/40 border border-white/[0.04] rounded-xl p-3.5 hover:border-white/[0.09] transition-all group"
+              >
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase ${getSeverityBadge(
+                        alert.severity
+                      )}`}
+                    >
+                      {alert.severity}
+                    </span>
+                    <span className="font-mono text-[11px] text-slate-400">
+                      {alert.id}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      <span suppressHydrationWarning>{timeStr}</span>
+                    </div>
+
+                    <button
+                      onClick={() => handleCopy(alert.message, alert.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-800 text-slate-400 hover:text-slate-200 rounded transition"
+                      title="Copy threat message"
+                    >
+                      {copiedId === alert.id ? (
+                        <Check className="w-3 h-3 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <span className="text-[11px] font-mono text-slate-500">
-                  {new Date(log.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
 
-              <div className="flex items-start gap-2 mt-2 text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
-                <Cpu className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                <p><strong className="text-cyan-400">AI Report:</strong> {log.aiSummary}</p>
+                <div className="text-xs text-slate-300 leading-relaxed font-normal">
+                  {alert.message}
+                </div>
               </div>
-
-              <div className="flex justify-end gap-2 mt-3 pt-2 border-t border-slate-900">
-                <button className="px-3 py-1 bg-red-950/90 hover:bg-red-900 border border-red-800/60 text-red-300 text-xs font-medium rounded transition">
-                  Enforce IP Ban
-                </button>
-                <button className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded transition">
-                  View Payload Diffs
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
