@@ -1,63 +1,80 @@
 import os
+from typing import Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
+class SecurityAIReporter:
     """
-    Interface Contract:
-    Signature: generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str
-    Returns a concise, 1-to-2 sentence human-readable CISO incident summary using Google Gemini.
+    LangChain & OpenAI powered automated security incident report generator.
     """
-    api_key = os.getenv("GOOGLE_API_KEY")
+    def __init__(self):
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        self.chain = None
+        self._init_langchain()
 
-    if api_key and api_key != "your_google_api_key_here":
+    def _init_langchain(self):
+        if not self.api_key or self.api_key == "your_openai_api_key_here":
+            print("⚠️ OPENAI_API_KEY missing or placeholder. Running AI reporter in fallback mode.")
+            return
+
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            from langchain_core.prompts import PromptTemplate
-            from langchain_core.output_parsers import StrOutputParser # <-- NEW IMPORT
+            from langchain_openai import ChatOpenAI
+            from langchain.prompts import PromptTemplate
 
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-3.5-flash",
-                google_api_key=api_key,
-                temperature=0.2
-            )
-            prompt = PromptTemplate(
-                input_variables=["ip", "attack_type", "raw_payload"],
+            llm = ChatOpenAI(temperature=0.2, model=self.model_name, openai_api_key=self.api_key)
+            prompt_template = PromptTemplate(
+                input_variables=["ip", "threat_type", "payload", "anomaly_score"],
                 template="""
-                You are a Lead CISO Security Operations Assistant.
-                Analyze the following security incident and generate a concise 1-to-2 sentence executive incident summary for the CISO:
-                - Attacker IP: {ip}
-                - Attack Type: {attack_type}
-                - Raw Payload: {raw_payload}
+                You are Nibdefender's Lead Security Operations AI Assistant.
+                Analyze the following flagged HTTP security incident and generate a concise 2-sentence executive summary:
 
-                Summary should highlight the threat impact and immediate mitigation status.
+                - Attacker IP: {ip}
+                - Threat Type: {threat_type}
+                - Malicious Payload: {payload}
+                - Anomaly Score: {anomaly_score}
+
+                Provide actionable advice on mitigation steps.
                 """
             )
-            
-            # Add StrOutputParser to the end of the chain
-            chain = prompt | llm | StrOutputParser() 
-            
-            # The result is now guaranteed to be a clean string
-            report_text = chain.invoke({
-                "ip": ip,
-                "attack_type": attack_type,
-                "raw_payload": raw_payload
-            }).strip()
-            
-            if report_text:
-                return report_text
+            self.chain = prompt_template | llm
+            print("✅ LangChain OpenAI incident analysis chain initialized.")
         except Exception as e:
-            print(f"⚠️ Google Gemini / LangChain execution error ({e}). Using local fallback mock.")
+            print(f"⚠️ Error setting up LangChain OpenAI chain: {e}")
 
-    # Local fallback mocking if GOOGLE_API_KEY is missing or fails
-    payload_preview = raw_payload[:40] + "..." if len(raw_payload) > 40 else raw_payload
-    return (
-        f"[CISO Incident Summary] Flagged high-risk {attack_type} vector originating from IP {ip} "
-        f"carrying payload '{payload_preview}'. Autonomous rate-limiting and blocking countermeasures have been enforced."
-    )
+    def generate_report(self, incident: Dict[str, Any]) -> str:
+        """
+        Generate incident report for dashboard feed.
+        """
+        ip = incident.get("ip", "Unknown")
+        threat_type = incident.get("threat_type", "ANOMALY")
+        payload = incident.get("payload", "N/A")
+        anomaly_score = incident.get("anomaly_score", 0.9)
+
+        if self.chain:
+            try:
+                response = self.chain.invoke({
+                    "ip": ip,
+                    "threat_type": threat_type,
+                    "payload": payload,
+                    "anomaly_score": anomaly_score
+                })
+                return response.content.strip()
+            except Exception as e:
+                print(f"Error calling OpenAI via LangChain: {e}")
+
+        # Structured fallback response generator if LLM unavailable
+        return f"[Nibdefender Guard] Detected {threat_type} vector from IP {ip}. Payload contains high-entropy pattern (Score: {anomaly_score}). Recommended action: Instant IP block."
 
 if __name__ == "__main__":
-    report = generate_threat_report("192.168.1.100", "SQL_INJECTION", "username=' UNION SELECT password FROM users--")
-    print("\n--- Test Generated Report ---")
+    reporter = SecurityAIReporter()
+    test_incident = {
+        "ip": "192.168.1.100",
+        "threat_type": "SQL_INJECTION",
+        "payload": "username=' UNION SELECT password FROM users--",
+        "anomaly_score": 0.98
+    }
+    report = reporter.generate_report(test_incident)
+    print("\n--- Generated Incident Report ---")
     print(report)

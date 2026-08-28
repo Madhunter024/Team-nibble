@@ -1,10 +1,6 @@
-# 🛡️ Nibdefender
-
 **Nibdefender** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. Developed during a 48-hour hackathon, Nibdefender combines FastAPI backend security middleware, Scikit-learn anomaly detection, LangChain automated incident reporting, and a Tremor dashboard for real-time observability.
 
 ---
-
-## 🏗️ Monorepo Architecture
 
 ```
 Nibdefender/
@@ -32,8 +28,6 @@ Nibdefender/
 
 ---
 
-## 🚀 Quick Start Guide
-
 ### 1. Backend Setup (FastAPI & Redis)
 ```bash
 cd backend
@@ -42,6 +36,25 @@ source venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
+
+#### Backend API Interface Contract (`GET /api/threat-metrics`)
+Returns real-time operational security metrics, Redis-blocked IP sets, and alert feeds:
+```json
+{
+  "total_requests": 150,
+  "blocked_ips_count": 2,
+  "blocked_ips_list": ["192.168.1.105", "10.0.0.5"],
+  "recent_alerts": [
+    {
+      "id": "alert_a1b2c3d4",
+      "timestamp": "2026-08-28T17:45:00.000Z",
+      "severity": "HIGH",
+      "message": "IP 192.168.1.105 blocked: Rate limit exceeded (52 req/min > 50 req/min)"
+    }
+  ]
+}
+```
+
 
 ### 2. Frontend Setup (Next.js & Tremor)
 ```bash
@@ -68,8 +81,6 @@ python attacker.py
 
 ---
 
-## 🛠️ Prerequisites & System Dependencies Installation
-
 Before running Nibdefender, ensure you have **Python (3.9+)**, **Node.js (18+)**, **npm**, and **Redis Server** installed on your system.
 
 ### Required Software & Tools
@@ -83,7 +94,6 @@ Before running Nibdefender, ensure you have **Python (3.9+)**, **Node.js (18+)**
 ---
 
 ### 💻 OS-Specific Installation Commands
-
 #### 🍎 macOS (via Homebrew)
 ```bash
 # 1. Install Homebrew (if not already installed)
@@ -143,10 +153,8 @@ sudo service redis-server start
 
 ---
 
-## 🔒 Key Features
 - **Redis IP Rate Limiting & Blocking:** Dynamic IP throttling and immediate blocking of flagged malicious addresses.
 - **JWT Authentication Guard:** Token validation and access control middleware.
 - **ML Anomaly Detection:** IsolationForest model trained on request velocity, entropy, and payload anomalies.
 - **AI-Powered Incident Reports:** LLM-generated analysis summarizing detected security incidents in human-readable reports.
 - **Real-Time Tremor Dashboard:** Live threat feed visualizer and operational security metrics.
-
