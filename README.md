@@ -1,6 +1,6 @@
 # 🛡️ Nibdefender
 
-**Nibdefender** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. Developed during a 48-hour hackathon, Nibdefender combines FastAPI backend security middleware, Scikit-learn anomaly detection, LangChain automated incident reporting, and a Tremor dashboard for real-time observability.
+**Nibdefender** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. Nibdefender combines FastAPI backend security middleware, Scikit-learn anomaly detection, LangChain automated incident reporting, and a Tremor dashboard for real-time observability.
 
 ---
 
