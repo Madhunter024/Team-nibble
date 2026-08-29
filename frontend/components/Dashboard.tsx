@@ -85,7 +85,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-[#080b11] text-slate-100 p-4 sm:p-6 lg:p-8 ambient-bg selection:bg-cyan-500 selection:text-slate-950">
+    <div className="bg-[#080b11] text-slate-100 p-4 sm:p-6 lg:p-8 ambient-bg selection:bg-cyan-500 selection:text-slate-950 h-full">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ========================================================= */}
@@ -212,6 +212,30 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
         </section>
+
+        {/* ========================================================= */}
+        {/* EXECUTIVE AI THREAT CARD */}
+        {/* ========================================================= */}
+        {metrics.recent_alerts && metrics.recent_alerts.length > 0 && metrics.recent_alerts[0].severity === 'HIGH' && (
+          <section className="relative overflow-hidden rounded-xl bg-slate-900/40 border border-indigo-500/30 p-1">
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-cyan-500/10 blur-xl"></div>
+            <div className="relative bg-slate-950/80 backdrop-blur-sm p-5 rounded-lg border border-white/5 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-indigo-500/20 rounded-md">
+                  <Zap className="w-4 h-4 text-indigo-400" />
+                </div>
+                <h3 className="text-sm font-bold text-indigo-300 tracking-wide uppercase">AI Threat Analysis (Gemini)</h3>
+                <span className="ml-auto flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 leading-relaxed font-mono">
+                {metrics.recent_alerts[0].message}
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* ========================================================= */}
         {/* 3. TRAFFIC SECTION */}

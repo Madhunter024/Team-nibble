@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dashboard } from '../components/Dashboard';
+import { AttackerConsole } from '../components/AttackerConsole';
 import { fetchThreatMetrics, unblockIpOnBackend } from '../lib/api';
 import {
   initialMockData,
@@ -83,10 +84,10 @@ export default function Home() {
     // Initial fetch on mount
     pollData();
 
-    // 2000ms polling interval
+    // 1500ms polling interval
     const interval = setInterval(() => {
       pollData();
-    }, 2000);
+    }, 1500);
 
     return () => clearInterval(interval);
   }, [pollData]);
@@ -146,14 +147,24 @@ export default function Home() {
   }, []);
 
   return (
-    <Dashboard
-      metrics={metrics}
-      meta={meta}
-      trafficHistory={trafficHistory}
-      loading={loading}
-      onRefresh={handleRefresh}
-      onUnblockIp={handleUnblockIp}
-      onTriggerSimulatedAttack={handleTriggerSimulatedAttack}
-    />
+    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-[#080b11]">
+      {/* Left Panel: Attacker Console (40%) */}
+      <div className="lg:w-[40%] h-1/2 lg:h-full p-4 lg:p-6 border-b lg:border-b-0 lg:border-r border-white/[0.06] overflow-y-auto">
+        <AttackerConsole />
+      </div>
+
+      {/* Right Panel: Defender CISO Dashboard (60%) */}
+      <div className="lg:w-[60%] h-1/2 lg:h-full overflow-y-auto">
+        <Dashboard
+          metrics={metrics}
+          meta={meta}
+          trafficHistory={trafficHistory}
+          loading={loading}
+          onRefresh={handleRefresh}
+          onUnblockIp={handleUnblockIp}
+          onTriggerSimulatedAttack={handleTriggerSimulatedAttack}
+        />
+      </div>
+    </div>
   );
 }

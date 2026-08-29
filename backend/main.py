@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import asyncio
 from datetime import timedelta
 from typing import Optional, Dict, Any
 from pathlib import Path
@@ -97,7 +98,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS middleware dynamically using settings
+# Register Telemetry & Rate Limiting Middlewares globally
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(TelemetryMiddleware)
+
+# Configure CORS middleware dynamically using settings (Must be OUTERMOST)
 origins = settings.ALLOWED_ORIGINS if settings.ALLOWED_ORIGINS else ["http://localhost:3000"]
 app.add_middleware(
     CORSMiddleware,
@@ -106,10 +111,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Register Telemetry & Rate Limiting Middlewares globally
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(TelemetryMiddleware)
 
 # Include Routers
 app.include_router(dummy_router)

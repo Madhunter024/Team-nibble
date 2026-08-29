@@ -131,10 +131,10 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> d
         # Save to Redis list:incidents and in-memory tracker
         tracker_instance.add_incident(incident_record)
 
-        # Add to ThreatTracker alert log
+        # Add to ThreatTracker alert log with full CISO report
         tracker_instance.add_alert(
             severity="CRITICAL" if action == "BLOCKED" else "HIGH",
-            message=f"{threat_type} detected from {client_ip} (score: {anomaly_score}). Action: {action}."
+            message=ciso_report
         )
 
     return result
