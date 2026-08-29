@@ -119,6 +119,8 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             except Exception as e:
                 logger.debug(f"Failed streaming telemetry to Redis: {e}")
 
+        response = await call_next(request)
+
         # Async ML Anomaly Evaluation for active traffic respecting active sampling rate
         excluded_ml_paths = [
             "/health", "/docs", "/openapi.json", "/redoc", "/",
@@ -140,5 +142,4 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             else:
                 tracker_instance.increment_bypassed_requests()
 
-        response = await call_next(request)
         return response

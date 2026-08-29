@@ -44,6 +44,7 @@ export async function fetchThreatMetrics(): Promise<ThreatMetricsResponse> {
           sampled_requests_count: data.sampled_requests_count,
           bypassed_requests_count: data.bypassed_requests_count,
           compute_saved_pct: data.compute_saved_pct,
+          current_anomaly_score: data.current_anomaly_score,
         },
         meta: {
           isFallback: false,

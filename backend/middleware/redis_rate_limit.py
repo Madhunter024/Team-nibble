@@ -69,6 +69,7 @@ class ThreatTracker:
                 }
             ]
         }
+        self.current_anomaly_score = 0.12
 
     def set_sampling_rate(self, rate: float) -> None:
         """Set active API sampling rate (0.05 to 1.0)."""
@@ -227,7 +228,7 @@ class ThreatTracker:
                 key = f"rate_limit:{ip}"
                 pipeline = self.redis.pipeline()
                 pipeline.zremrangebyscore(key, 0, current_time - self.window_seconds)
-                pipeline.zadd(key, {str(current_time): current_time})
+                pipeline.zadd(key, {f"{current_time}:{uuid.uuid4().hex[:6]}": current_time})
                 pipeline.zcard(key)
                 pipeline.expire(key, self.window_seconds)
                 results = pipeline.execute()
@@ -273,6 +274,16 @@ class ThreatTracker:
         """
         blocked_list = self.get_blocked_ips()
         rate = self.get_sampling_rate()
+        
+        # Apply exponential decay to anomaly score so it doesn't get stuck after a spike
+        current_score = getattr(self, "current_anomaly_score", 0.12)
+        if current_score > 0.12:
+            decayed = 0.12 + (current_score - 0.12) * 0.85
+            if decayed < 0.13:
+                decayed = 0.12
+            self.current_anomaly_score = decayed
+            current_score = decayed
+
         return {
             "total_requests": self.get_total_requests(),
             "blocked_ips_count": len(blocked_list),
@@ -283,6 +294,7 @@ class ThreatTracker:
             "sampled_requests_count": self.in_memory_metrics.get("sampled_requests_count", 0),
             "bypassed_requests_count": self.in_memory_metrics.get("bypassed_requests_count", 0),
             "compute_saved_pct": int(round((1.0 - rate) * 100)),
+            "current_anomaly_score": round(current_score, 4),
             "recent_alerts": self.get_recent_alerts(limit=25)
         }
 
@@ -326,13 +338,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # 3. Check rate limiting threshold (50 req / 60 sec)
         allowed, count = self.tracker.check_rate_limit(client_ip)
         if not allowed:
-            # Immediately block IP on rate limit breach
-            self.tracker.block_ip(client_ip, reason=f"Rate limit exceeded ({count} req/min > 50 req/min)")
+            self.tracker.increment_blocked_requests()
             return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 content={
                     "error": "Too Many Requests",
-                    "detail": "Too Many Requests. IP address has been blocked.",
+                    "detail": "Rate limit exceeded. Too many requests.",
                     "ip": client_ip,
                     "request_count": count
                 }

@@ -67,6 +67,10 @@ async def login_target(request: Request, credentials: LoginRequest = Body(...)):
 
     # Check for SQL Injection syntax
     has_sqli = any(p in username for p in SQLI_PATTERNS) or any(p in password for p in SQLI_PATTERNS)
+
+    if hasattr(request.state, "telemetry") and isinstance(request.state.telemetry, dict):
+        request.state.telemetry["is_potential_sqli"] = has_sqli
+        request.state.telemetry["raw_payload"] = f"username={username}&password={password}"
     if has_sqli:
         redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
         await block_ip(redis_client, client_ip, duration_seconds=3600)

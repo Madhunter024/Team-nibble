@@ -79,9 +79,10 @@ export default function Home() {
         blockedPerSec = Math.random() > 0.5 ? Math.floor(Math.random() * 3) + 1 : 0;
       }
 
-      const anomalyIndex = parseFloat(
-        (0.12 + (blockedPerSec > 5 ? 0.75 : Math.random() * 0.2)).toFixed(2)
-      );
+      let anomalyIndex = response.data.current_anomaly_score;
+      if (anomalyIndex === undefined || isNaN(anomalyIndex)) {
+        anomalyIndex = parseFloat((0.12 + (blockedPerSec > 5 ? 0.75 : 0)).toFixed(2));
+      }
 
       setTrafficHistory((prev) => {
         const updated = [

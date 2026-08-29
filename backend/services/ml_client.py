@@ -86,10 +86,13 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None, raw_
         "inference_engine": engine_name
     }
 
+    # Update real-time tracker score
+    tracker_instance.current_anomaly_score = result["anomaly_score"]
+
     # 2. In-Memory Autonomous Mitigation & Real-Time Security Tracking
     if is_anomaly:
         action = "FLAGGED"
-        if anomaly_score >= 0.90:
+        if anomaly_score >= 0.90 and threat_type in ["SQL_INJECTION", "XSS_ATTACK"]:
             action = "BLOCKED"
             await block_ip(redis_client, client_ip, duration_seconds=86400)
             logger.warning(f"IP {client_ip} automatically blocked locally due to high anomaly score {anomaly_score}.")

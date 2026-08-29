@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import uuid
 import inspect
 import logging
 from typing import Optional, Dict, List, Set, Tuple, Any
@@ -139,7 +140,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             try:
                 pipe = redis_client.pipeline()
                 pipe.zremrangebyscore(zset_key, 0, current_time - window_seconds)
-                pipe.zadd(zset_key, {str(current_time): current_time})
+                pipe.zadd(zset_key, {f"{current_time}:{uuid.uuid4().hex[:6]}": current_time})
                 pipe.zcard(zset_key)
                 pipe.expire(zset_key, window_seconds)
                 results = await _safe_await(pipe.execute())
@@ -202,13 +203,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if not allowed:
             tracker_instance.increment_blocked_requests()
-            # Check for consecutive violations >= 3
-            if violations >= 3:
-                await block_ip(redis_client, client_ip, duration_seconds=3600)
-                self.memory_blacklist[client_ip] = time.time() + 3600
+            if count % 10 == 0 or violations == 1:
                 tracker_instance.add_alert(
-                    severity="CRITICAL",
-                    message=f"IP {client_ip} automatically blacklisted for 1hr after {violations} consecutive rate limit breaches."
+                    severity="HIGH",
+                    message=f"Distributed Token-Bucket Exhaustion (DDoS Spike) detected from IP {client_ip} - {count} req/min"
                 )
 
             headers = {

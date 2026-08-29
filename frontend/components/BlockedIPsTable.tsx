@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Copy, Check, ShieldCheck } from 'lucide-react';
 
 import { ThreatAlert } from '../lib/mockData';
@@ -11,57 +11,98 @@ interface BlockedIPsTableProps {
   onUnblock?: (ip: string) => void;
 }
 
-const getIpDetails = (ip: string, alerts: ThreatAlert[] = []) => {
-  const matchingAlert = alerts.find((a) => a.message.includes(ip));
-  
-  let reason = "ML Threat Quarantined";
-  let time = "Just now";
-
-  if (matchingAlert) {
-    const msg = matchingAlert.message;
-    if (msg.includes("SQL") || msg.includes("sql")) {
-      reason = "SQL Injection Vector";
-    } else if (msg.includes("ISOLATION") || msg.includes("ANOMALY")) {
-      reason = "IsolationForest Anomaly";
-    } else if (msg.includes("rate limit") || msg.includes("DDoS")) {
-      reason = "DDoS Rate Limit Breach";
-    } else {
-      reason = "Zero-Trust ML Quarantine";
-    }
-
-    try {
-      const alertTime = new Date(matchingAlert.timestamp).getTime();
-      const now = Date.now();
-      const diffSec = Math.max(0, Math.floor((now - alertTime) / 1000));
-
-      if (diffSec < 5) time = "Just now";
-      else if (diffSec < 60) time = `${diffSec}s ago`;
-      else if (diffSec < 3600) time = `${Math.floor(diffSec / 60)}m ago`;
-      else time = `${Math.floor(diffSec / 3600)}h ago`;
-    } catch {
-      time = "Just now";
-    }
-  } else {
-    // Dynamic fallback based on IP prefix
-    if (ip.startsWith("185.") || ip.startsWith("194.")) {
-      reason = "SQL Injection Vector";
-    } else if (ip.startsWith("45.") || ip.startsWith("91.")) {
-      reason = "DDoS Rate Limit Breach";
-    } else {
-      reason = "ML Threat Quarantined";
-    }
-    time = "Just now";
-  }
-
-  return { reason, time };
-};
-
 export const BlockedIPsTable: React.FC<BlockedIPsTableProps> = ({ blockedIps = [], alerts = [], onUnblock }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
   const [unblockedSet, setUnblockedSet] = useState<Set<string>>(new Set());
   const [manualIpInput, setManualIpInput] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+
+  // 1-second real-time clock state to drive live relative time updates
+  const [now, setNow] = useState<number>(Date.now());
+
+  // Store first-seen timestamp (ms) for every blocked IP
+  const firstSeenMapRef = React.useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Update timestamps map whenever blockedIps or alerts change
+  useEffect(() => {
+    const currentTime = Date.now();
+    blockedIps.forEach((ip, idx) => {
+      if (!firstSeenMapRef.current[ip]) {
+        // Find matching alert timestamp if available
+        const matchingAlert = alerts.find((a) => a.message.includes(ip));
+        if (matchingAlert && matchingAlert.timestamp) {
+          const parsed = new Date(matchingAlert.timestamp).getTime();
+          if (!isNaN(parsed)) {
+            firstSeenMapRef.current[ip] = parsed;
+            return;
+          }
+        }
+        // Stagger initial pre-existing IPs so they don't all show the exact same millisecond
+        const offsetMs = idx * 18000; // 18s stagger per initial IP
+        firstSeenMapRef.current[ip] = Math.max(1000, currentTime - offsetMs);
+      }
+    });
+  }, [blockedIps, alerts]);
+
+  const getIpDetails = (ip: string) => {
+    const matchingAlert = alerts.find((a) => a.message.includes(ip));
+    
+    let reason = "ML Threat Quarantined";
+    if (matchingAlert) {
+      const msg = matchingAlert.message;
+      if (msg.includes("SQL") || msg.includes("sql")) {
+        reason = "SQL Injection Vector";
+      } else if (msg.includes("ISOLATION") || msg.includes("ANOMALY")) {
+        reason = "IsolationForest Anomaly";
+      } else if (msg.includes("rate limit") || msg.includes("DDoS") || msg.includes("Exhaustion")) {
+        reason = "DDoS Rate Limit Breach";
+      } else if (msg.includes("Honeypot") || msg.includes("probe")) {
+        reason = "Honeypot Trap Violation";
+      } else {
+        reason = "Zero-Trust ML Quarantine";
+      }
+    } else {
+      if (ip.startsWith("185.") || ip.startsWith("194.")) {
+        reason = "SQL Injection Vector";
+      } else if (ip.startsWith("45.") || ip.startsWith("91.")) {
+        reason = "DDoS Rate Limit Breach";
+      } else {
+        reason = "ML Threat Quarantined";
+      }
+    }
+
+    let ipTimeMs = firstSeenMapRef.current[ip];
+    if (!ipTimeMs && matchingAlert && matchingAlert.timestamp) {
+      const parsed = new Date(matchingAlert.timestamp).getTime();
+      if (!isNaN(parsed)) ipTimeMs = parsed;
+    }
+    if (!ipTimeMs) {
+      ipTimeMs = now;
+      firstSeenMapRef.current[ip] = ipTimeMs;
+    }
+
+    const diffSec = Math.max(0, Math.floor((now - ipTimeMs) / 1000));
+    let timeStr = "Just now";
+    if (diffSec < 5) {
+      timeStr = "Just now";
+    } else if (diffSec < 60) {
+      timeStr = `${diffSec}s ago`;
+    } else if (diffSec < 3600) {
+      timeStr = `${Math.floor(diffSec / 60)}m ago`;
+    } else {
+      timeStr = `${Math.floor(diffSec / 3600)}h ago`;
+    }
+
+    return { reason, time: timeStr };
+  };
 
   const handleCopy = (ip: string) => {
     navigator.clipboard.writeText(ip);
@@ -177,7 +218,7 @@ export const BlockedIPsTable: React.FC<BlockedIPsTableProps> = ({ blockedIps = [
               </tr>
             ) : (
               filteredIps.map((ip) => {
-                const details = getIpDetails(ip, alerts);
+                const details = getIpDetails(ip);
                 return (
                   <tr key={ip} className="hover:bg-slate-900/40 transition-colors">
                     {/* IP */}

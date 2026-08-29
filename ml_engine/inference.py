@@ -124,7 +124,7 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     iso_pred = 1
     decision_score = 0.0
 
-    if _iso_forest is not None:
+    if _iso_forest is not None and (payload_size > 50 or velocity > 10 or header_entropy > 4.5):
         try:
             features = np.array([[velocity, payload_size, header_entropy]])
             iso_pred = int(_iso_forest.predict(features)[0])  # -1 for anomaly, 1 for normal
@@ -132,7 +132,7 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
         except Exception as e:
             logger.debug(f"IsolationForest prediction error: {e}")
 
-    if velocity > 30 or payload_size > 5000:
+    if velocity > 15 or payload_size > 5000:
         iso_pred = -1
 
     # 3. Combine Evaluation Rules
@@ -141,7 +141,7 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     threat_type = "NORMAL"
     if sqli_detected:
         threat_type = "SQL_INJECTION"
-    elif velocity > 30:
+    elif velocity > 15:
         threat_type = "HIGH_VELOCITY_DDOS"
     elif iso_pred == -1:
         threat_type = "ISOLATION_FOREST_ANOMALY"
@@ -152,7 +152,7 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     elif threat_type == "HIGH_VELOCITY_DDOS":
         anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
     elif iso_pred == -1:
-        anomaly_score = min(0.95, max(0.75, 0.85 - decision_score))
+        anomaly_score = min(0.85, max(0.65, 0.75 - decision_score))
     else:
         anomaly_score = max(0.12, round(confidence * 0.5, 4))
 
