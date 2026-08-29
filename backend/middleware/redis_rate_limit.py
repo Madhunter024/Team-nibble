@@ -43,7 +43,7 @@ class ThreatTracker:
         redis_port = int(os.getenv("REDIS_PORT", 6379))
         try:
             import redis
-            client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True, socket_connect_timeout=1)
+            client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True, socket_connect_timeout=1, protocol=2)
             client.ping()
             self.redis = client
             logger.info("Connected to Redis successfully for ThreatTracker.")

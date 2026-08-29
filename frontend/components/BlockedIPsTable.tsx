@@ -25,6 +25,8 @@ export const BlockedIPsTable: React.FC<BlockedIPsTableProps> = ({ blockedIps = [
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
   const [unblockedSet, setUnblockedSet] = useState<Set<string>>(new Set());
+  const [manualIpInput, setManualIpInput] = useState('');
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   const handleCopy = (ip: string) => {
     navigator.clipboard.writeText(ip);
@@ -33,10 +35,23 @@ export const BlockedIPsTable: React.FC<BlockedIPsTableProps> = ({ blockedIps = [
   };
 
   const handleUnblock = (ip: string) => {
-    setUnblockedSet((prev) => new Set(prev).add(ip));
+    const cleanIp = ip.trim();
+    if (!cleanIp) return;
+    setUnblockedSet((prev) => new Set(prev).add(cleanIp));
     if (onUnblock) {
-      onUnblock(ip);
+      onUnblock(cleanIp);
     }
+  };
+
+  const handleManualUnblockSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanIp = manualIpInput.trim();
+    if (!cleanIp) return;
+
+    handleUnblock(cleanIp);
+    setManualIpInput('');
+    setFeedbackMsg(`IP ${cleanIp} unblocked successfully`);
+    setTimeout(() => setFeedbackMsg(null), 3000);
   };
 
   const activeBlockedIps = useMemo(() => {
@@ -65,16 +80,45 @@ export const BlockedIPsTable: React.FC<BlockedIPsTableProps> = ({ blockedIps = [
         </div>
       </div>
 
-      {/* Search Input */}
-      <div className="relative my-3">
-        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Search blacklisted IP..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-3 py-1.5 bg-slate-950/60 border border-white/[0.06] rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-700 transition"
-        />
+      {/* Manual Unblock Feedback Notification */}
+      {feedbackMsg && (
+        <div className="mt-2.5 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400 font-mono animate-fade-in">
+          ✓ {feedbackMsg}
+        </div>
+      )}
+
+      {/* Search Bar & Manual Unblock Input Form */}
+      <div className="flex flex-col sm:flex-row gap-2 my-3">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search blacklisted IP..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-950/60 border border-white/[0.06] rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-700 transition"
+          />
+        </div>
+
+        {/* Manual Unblock Input Form */}
+        <form onSubmit={handleManualUnblockSubmit} className="flex gap-1.5">
+          <input
+            type="text"
+            placeholder="Manual IP (e.g. 192.168.1.1)"
+            value={manualIpInput}
+            onChange={(e) => setManualIpInput(e.target.value)}
+            className="w-44 px-2.5 py-1.5 bg-slate-950/60 border border-white/[0.06] rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition font-mono"
+          />
+          <button
+            type="submit"
+            disabled={!manualIpInput.trim()}
+            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 shrink-0"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Unblock
+          </button>
+        </form>
       </div>
 
       {/* Table Container */}

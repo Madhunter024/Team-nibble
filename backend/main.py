@@ -70,7 +70,8 @@ async def lifespan(app: FastAPI):
         port=settings.REDIS_PORT,
         db=settings.REDIS_DB,
         decode_responses=True,
-        socket_connect_timeout=2
+        socket_connect_timeout=2,
+        protocol=2
     )
     app.state.redis = redis_client
 
@@ -150,6 +151,38 @@ async def get_threat_metrics():
     blocked IP list, and recent security alerts.
     """
     return tracker_instance.get_metrics_snapshot()
+
+
+class ManualUnblockPayload(BaseModel):
+    ip: str = Field(..., json_schema_extra={"example": "192.168.1.105"})
+
+
+@app.post("/api/unblock-ip")
+@app.post("/api/v1/unblock-ip")
+async def manual_unblock_ip(request: Request, payload: ManualUnblockPayload = Body(...)):
+    """
+    Manually unblocks a blacklisted IP address from Redis and ThreatTracker.
+    """
+    redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
+    
+    try:
+        from backend.middleware.rate_limiter import unblock_ip
+    except ImportError:
+        from middleware.rate_limiter import unblock_ip
+        
+    await unblock_ip(redis_client, payload.ip.strip())
+    
+    tracker_instance.add_alert(
+        severity="MEDIUM",
+        message=f"IP {payload.ip.strip()} was manually unblocked."
+    )
+    
+    return {
+        "status": "success",
+        "message": f"IP {payload.ip.strip()} unblocked successfully.",
+        "ip": payload.ip.strip()
+    }
+
 
 
 @app.get("/")
