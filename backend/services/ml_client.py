@@ -28,9 +28,9 @@ logger = logging.getLogger("nibdefender.ml_client")
 
 async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None, raw_payload: str = "") -> dict:
     """
-    Evaluates request telemetry purely in-memory using local Scikit-Learn ML engine:
+    Evaluates request telemetry in-memory using local ML engine (MobileBERT + IsolationForest):
     1. Executes sub-millisecond local ML threat detection via `detect_threat_locally`.
-    2. Computes `is_anomaly`, `anomaly_score`, and `threat_type` with 0 external network calls.
+    2. Computes `is_anomaly`, `anomaly_score`, `threat_type`, `sqli_detected`, and `confidence`.
     3. If `anomaly_score >= 0.90`, automatically blocks client IP in Redis for 24h.
     4. Generates an in-memory CISO incident report and updates real-time tracker logs.
     """
@@ -43,37 +43,34 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None, raw_
     is_sqli = telemetry_data.get("is_potential_sqli", False)
     is_xss = telemetry_data.get("is_potential_xss", False)
 
-    # 1. Purely local Scikit-Learn ML Engine Inference
+    sqli_detected = False
+    confidence = 0.0
+    engine_name = "MobileBERT + IsolationForest"
+
+    # 1. Local ML Engine Inference (MobileBERT + IsolationForest)
     if detect_threat_locally is not None:
-        local_result = detect_threat_locally(telemetry_data, raw_payload=payload_text)
-        is_anomaly = local_result["is_anomaly"]
-        anomaly_score = local_result["anomaly_score"]
-        threat_type = local_result["threat_type"]
+        try:
+            local_result = detect_threat_locally(telemetry_data, raw_payload=payload_text)
+            is_anomaly = local_result["is_anomaly"]
+            anomaly_score = local_result["anomaly_score"]
+            threat_type = local_result["threat_type"]
+            sqli_detected = local_result.get("sqli_detected", False)
+            confidence = local_result.get("confidence", 0.0)
+            engine_name = local_result.get("inference_engine", engine_name)
+        except Exception as e:
+            logger.warning(f"Error during local ML detection: {e}")
+            is_anomaly = False
+            anomaly_score = 0.15
+            threat_type = "NORMAL"
     else:
         # In-memory heuristic fallback
         is_anomaly = False
         anomaly_score = 0.15
         threat_type = "NORMAL"
-        if is_sqli:
-            threat_type = "SQL_INJECTION"
-            anomaly_score = 0.95
-            is_anomaly = True
-        elif is_xss:
-            threat_type = "XSS_ATTACK"
-            anomaly_score = 0.92
-            is_anomaly = True
-        elif velocity > 30:
-            threat_type = "HIGH_VELOCITY_DDOS"
-            anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
-            is_anomaly = True
-        elif payload_size > 5000 or entropy > 5.5:
-            threat_type = "ANOMALOUS_PAYLOAD"
-            anomaly_score = 0.78
-            is_anomaly = True
 
-    if is_sqli and threat_type == "NORMAL":
+    if (is_sqli or sqli_detected) and threat_type in ["NORMAL", "ISOLATION_FOREST_ANOMALY"]:
         threat_type = "SQL_INJECTION"
-        anomaly_score = 0.95
+        anomaly_score = max(anomaly_score, 0.95)
         is_anomaly = True
     elif is_xss and threat_type == "NORMAL":
         threat_type = "XSS_ATTACK"
@@ -82,9 +79,11 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None, raw_
 
     result = {
         "is_anomaly": is_anomaly,
-        "anomaly_score": round(anomaly_score, 4),
+        "anomaly_score": round(float(anomaly_score), 4),
         "threat_type": threat_type,
-        "inference_engine": "Local Scikit-Learn Engine"
+        "sqli_detected": bool(sqli_detected),
+        "confidence": round(float(confidence), 4),
+        "inference_engine": engine_name
     }
 
     # 2. In-Memory Autonomous Mitigation & Real-Time Security Tracking
