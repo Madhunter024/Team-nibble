@@ -27,7 +27,7 @@ export default function Home() {
   const [loading, setLoading] = useState<boolean>(false);
   const isPollingRef = useRef<boolean>(false);
   const lastTotalReqsRef = useRef<number | null>(null);
-  const lastBlockedCountRef = useRef<number | null>(null);
+  const lastBlockedReqsRef = useRef<number | null>(null);
 
   // Initialize traffic history on first mount (client-side only to avoid hydration mismatch)
   useEffect(() => {
@@ -53,23 +53,21 @@ export default function Home() {
       });
 
       const currentTotal = response.data.total_requests;
-      const currentBlocked = response.data.blocked_ips_count;
+      const currentBlocked = response.data.blocked_requests_count ?? response.data.blocked_ips_count;
 
       let reqPerSec = 0;
       let blockedPerSec = 0;
 
       if (lastTotalReqsRef.current !== null && currentTotal >= lastTotalReqsRef.current) {
-        const deltaReqs = currentTotal - lastTotalReqsRef.current;
-        reqPerSec = deltaReqs; // Polling every 1 second
+        reqPerSec = currentTotal - lastTotalReqsRef.current;
       }
 
-      if (lastBlockedCountRef.current !== null && currentBlocked >= lastBlockedCountRef.current) {
-        const deltaBlocked = currentBlocked - lastBlockedCountRef.current;
-        blockedPerSec = deltaBlocked;
+      if (lastBlockedReqsRef.current !== null && currentBlocked >= lastBlockedReqsRef.current) {
+        blockedPerSec = currentBlocked - lastBlockedReqsRef.current;
       }
 
       lastTotalReqsRef.current = currentTotal;
-      lastBlockedCountRef.current = currentBlocked;
+      lastBlockedReqsRef.current = currentBlocked;
 
       // Ambient baseline if traffic is idle
       if (reqPerSec === 0) {

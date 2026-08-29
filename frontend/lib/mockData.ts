@@ -8,6 +8,7 @@ export interface ThreatAlert {
 export interface ThreatMetrics {
   total_requests: number;
   blocked_ips_count: number;
+  blocked_requests_count?: number;
   blocked_ips_list: string[];
   recent_alerts: ThreatAlert[];
   sampling_rate?: number;

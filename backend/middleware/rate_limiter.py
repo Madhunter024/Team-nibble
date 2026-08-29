@@ -188,6 +188,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # 1. Dynamic IP Blacklist Verification
         if await self.is_blacklisted(redis_client, client_ip):
+            tracker_instance.increment_blocked_requests()
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
                 content={"error": "Access Denied: IP blocked by Nibdefender Threat Gateway"}
@@ -200,6 +201,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         window_seconds = settings.RATE_LIMIT_WINDOW_SECONDS
 
         if not allowed:
+            tracker_instance.increment_blocked_requests()
             # Check for consecutive violations >= 3
             if violations >= 3:
                 await block_ip(redis_client, client_ip, duration_seconds=3600)

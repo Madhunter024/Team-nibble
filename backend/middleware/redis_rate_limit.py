@@ -245,12 +245,21 @@ class ThreatTracker:
         count = len(valid_timestamps)
         return count <= self.rate_limit, count
 
+    def increment_blocked_requests(self):
+        if "blocked_requests_count" not in self.in_memory_metrics:
+            self.in_memory_metrics["blocked_requests_count"] = 0
+        self.in_memory_metrics["blocked_requests_count"] += 1
+
+    def get_blocked_requests_count(self) -> int:
+        return self.in_memory_metrics.get("blocked_requests_count", 0)
+
     def get_metrics_snapshot(self) -> Dict[str, Any]:
         """
         Returns exact JSON structure required by Frontend contract:
         {
           "total_requests": int,
           "blocked_ips_count": int,
+          "blocked_requests_count": int,
           "blocked_ips_list": list[str],
           "recent_alerts": [
             {
@@ -267,6 +276,7 @@ class ThreatTracker:
         return {
             "total_requests": self.get_total_requests(),
             "blocked_ips_count": len(blocked_list),
+            "blocked_requests_count": self.get_blocked_requests_count(),
             "blocked_ips_list": blocked_list,
             "sampling_rate": rate,
             "sampling_rate_pct": int(round(rate * 100)),
