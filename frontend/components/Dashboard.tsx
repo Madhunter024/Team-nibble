@@ -26,18 +26,29 @@ interface DashboardProps {
   meta?: ApiResponseMeta;
   trafficHistory?: TrafficDataPoint[];
   loading?: boolean;
+  samplingRate?: number;
   onRefresh?: () => void;
   onUnblockIp?: (ip: string) => void;
+  onSamplingRateChange?: (newRate: number) => void;
   onTriggerSimulatedAttack?: () => void;
 }
+
+const SAMPLING_OPTIONS = [
+  { rate: 0.2, label: "20%", subtitle: "Max Efficiency", computeSaved: "80% Compute Saved" },
+  { rate: 0.4, label: "40%", subtitle: "High Velocity", computeSaved: "60% Compute Saved" },
+  { rate: 0.5, label: "50%", subtitle: "Balanced Mode", computeSaved: "50% Compute Saved" },
+  { rate: 1.0, label: "100%", subtitle: "Full Inspection", computeSaved: "100% Monitored" },
+];
 
 export const Dashboard: React.FC<DashboardProps> = ({
   metrics,
   meta,
   trafficHistory = [],
   loading = false,
+  samplingRate,
   onRefresh,
   onUnblockIp,
+  onSamplingRateChange,
 }) => {
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('');
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
@@ -55,6 +66,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  const currentSamplingRate = samplingRate !== undefined ? samplingRate : (metrics.sampling_rate ?? 1.0);
   const isLive = meta ? !meta.isFallback : false;
 
   const securityControls = [
@@ -236,6 +248,72 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </section>
         )}
+
+        {/* ========================================================= */}
+        {/* 2.5. API TRAFFIC SAMPLING OPTIONS */}
+        {/* ========================================================= */}
+        <section className="glass-panel p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-indigo-950/50 border border-indigo-500/20 rounded-lg text-indigo-400">
+                <Sliders className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-100 tracking-tight">
+                  API Traffic Sampling Rate
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Choose the ML anomaly detection sampling of the API
+                </p>
+              </div>
+            </div>
+
+            {/* Current Active Badge */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-400">Active Rate:</span>
+              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                {Math.round(currentSamplingRate * 100)}% Sampling
+              </span>
+            </div>
+          </div>
+
+          {/* Sampling Option Buttons: 20%, 40%, 50%, 100% */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+            {SAMPLING_OPTIONS.map((opt) => {
+              const isSelected = Math.round(currentSamplingRate * 100) === Math.round(opt.rate * 100);
+              return (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => onSamplingRateChange && onSamplingRateChange(opt.rate)}
+                  className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? 'bg-gradient-to-br from-cyan-950/80 via-slate-900 to-slate-900 border-cyan-400/70 shadow-[0_0_16px_rgba(6,182,212,0.25)] text-white ring-1 ring-cyan-400/50'
+                      : 'bg-slate-950/60 hover:bg-slate-900/80 border-white/[0.08] hover:border-white/[0.18] text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-bold font-mono tracking-tight text-white">
+                      {opt.label}
+                    </span>
+                    {isSelected && (
+                      <span className="flex h-2.5 w-2.5 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400"></span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-medium text-slate-200 mt-1.5">
+                    {opt.subtitle}
+                  </div>
+                  <div className={`text-[10px] font-mono mt-0.5 ${isSelected ? 'text-cyan-300 font-semibold' : 'text-slate-400'}`}>
+                    {opt.computeSaved}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
         {/* ========================================================= */}
         {/* 3. TRAFFIC SECTION */}

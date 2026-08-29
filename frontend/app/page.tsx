@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dashboard } from '../components/Dashboard';
 import { AttackerConsole } from '../components/AttackerConsole';
-import { fetchThreatMetrics, unblockIpOnBackend } from '../lib/api';
+import { fetchThreatMetrics, unblockIpOnBackend, updateSamplingConfig } from '../lib/api';
 import {
   initialMockData,
   generateInitialTrafficHistory,
@@ -16,6 +16,7 @@ import {
 
 export default function Home() {
   const [metrics, setMetrics] = useState<ThreatMetrics>(initialMockData);
+  const [samplingRate, setSamplingRate] = useState<number>(1.0);
   const [meta, setMeta] = useState<ApiResponseMeta>({
     isFallback: true,
     timestamp: "2026-08-28T18:45:00.000Z",
@@ -107,6 +108,18 @@ export default function Home() {
     await unblockIpOnBackend(ipToUnblock);
   }, []);
 
+  // Handler for changing API sampling rate
+  const handleSamplingRateChange = useCallback(async (newRate: number) => {
+    setSamplingRate(newRate);
+    setMetrics((prev) => ({
+      ...prev,
+      sampling_rate: newRate,
+      sampling_rate_pct: Math.round(newRate * 100),
+      compute_saved_pct: Math.round((1.0 - newRate) * 100),
+    }));
+    await updateSamplingConfig(newRate);
+  }, []);
+
   // Handler for triggering an immediate attack simulation spike
   const handleTriggerSimulatedAttack = useCallback(async () => {
     // Trigger real attacks against live backend if available
@@ -160,8 +173,10 @@ export default function Home() {
           meta={meta}
           trafficHistory={trafficHistory}
           loading={loading}
+          samplingRate={samplingRate}
           onRefresh={handleRefresh}
           onUnblockIp={handleUnblockIp}
+          onSamplingRateChange={handleSamplingRateChange}
           onTriggerSimulatedAttack={handleTriggerSimulatedAttack}
         />
       </div>
