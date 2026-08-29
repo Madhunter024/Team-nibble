@@ -34,9 +34,9 @@ interface DashboardProps {
 }
 
 const SAMPLING_OPTIONS = [
-  { rate: 0.2, label: "20%", subtitle: "Max Efficiency", computeSaved: "80% Compute Saved" },
-  { rate: 0.4, label: "40%", subtitle: "High Velocity", computeSaved: "60% Compute Saved" },
-  { rate: 0.5, label: "50%", subtitle: "Balanced Mode", computeSaved: "50% Compute Saved" },
+  { rate: 0.25, label: "25%", subtitle: "Max Efficiency", computeSaved: "75% Compute Saved" },
+  { rate: 0.50, label: "50%", subtitle: "Balanced Mode", computeSaved: "50% Compute Saved" },
+  { rate: 0.75, label: "75%", subtitle: "High Inspection", computeSaved: "25% Compute Saved" },
   { rate: 1.0, label: "100%", subtitle: "Full Inspection", computeSaved: "100% Monitored" },
 ];
 
@@ -236,7 +236,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <div className="p-1.5 bg-indigo-500/20 rounded-md">
                   <Zap className="w-4 h-4 text-indigo-400" />
                 </div>
-                <h3 className="text-sm font-bold text-indigo-300 tracking-wide uppercase">AI Threat Analysis (Gemini)</h3>
+                <h3 className="text-sm font-bold text-indigo-300 tracking-wide uppercase">AI Threat Analysis (Local Scikit-Learn ML)</h3>
                 <span className="ml-auto flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>

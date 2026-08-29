@@ -165,6 +165,41 @@ class ManualUnblockPayload(BaseModel):
     ip: str = Field(..., json_schema_extra={"example": "192.168.1.105"})
 
 
+class SamplingConfigRequest(BaseModel):
+    sample_rate: float = Field(..., json_schema_extra={"example": 0.5})
+
+
+@app.post("/api/config/sampling")
+@app.post("/api/v1/config/sampling")
+async def update_sampling_config(request: Request, payload: SamplingConfigRequest = Body(...)):
+    """
+    Dynamically update API traffic sampling rate for local ML threat detection engine.
+    """
+    rate = max(0.05, min(1.0, float(payload.sample_rate)))
+    redis_client = getattr(request.app.state, "redis", None)
+    if redis_client:
+        try:
+            await redis_client.set("config:sampling_rate", str(rate))
+        except Exception as e:
+            logger.warning(f"Failed to update Redis sampling rate: {e}")
+
+    tracker_instance.set_sampling_rate(rate)
+    rate_pct = int(round(rate * 100))
+    saved_pct = int(round((1.0 - rate) * 100))
+
+    tracker_instance.add_alert(
+        severity="LOW",
+        message=f"API Sampling Rate adjusted to {rate_pct}% ({saved_pct}% compute overhead saved)."
+    )
+
+    return {
+        "status": "success",
+        "sampling_rate": rate,
+        "sampling_rate_pct": rate_pct,
+        "compute_saved_pct": saved_pct
+    }
+
+
 @app.post("/api/unblock-ip")
 @app.post("/api/v1/unblock-ip")
 async def manual_unblock_ip(request: Request, payload: ManualUnblockPayload = Body(...)):

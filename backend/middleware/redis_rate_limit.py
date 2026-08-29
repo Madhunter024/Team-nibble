@@ -57,6 +57,9 @@ class ThreatTracker:
         self.in_memory_metrics = {
             "total_requests": 0,
             "blocked_ips": set(),
+            "sampling_rate": 1.0,
+            "sampled_requests_count": 0,
+            "bypassed_requests_count": 0,
             "alerts": [
                 {
                     "id": "alert_init_1",
@@ -66,6 +69,47 @@ class ThreatTracker:
                 }
             ]
         }
+
+    def set_sampling_rate(self, rate: float) -> None:
+        """Set active API sampling rate (0.05 to 1.0)."""
+        rate = max(0.05, min(1.0, float(rate)))
+        self.in_memory_metrics["sampling_rate"] = rate
+        if self.redis:
+            try:
+                self.redis.set("config:sampling_rate", str(rate))
+            except Exception as e:
+                logger.warning(f"Redis set config:sampling_rate error: {e}")
+
+    def get_sampling_rate(self) -> float:
+        """Retrieve current sampling rate."""
+        if self.redis:
+            try:
+                val = self.redis.get("config:sampling_rate")
+                if val is not None:
+                    return float(val)
+            except Exception:
+                pass
+        return self.in_memory_metrics.get("sampling_rate", 1.0)
+
+    def increment_sampled_requests(self) -> int:
+        """Increment count of requests processed by ML inspection."""
+        if self.redis:
+            try:
+                return int(self.redis.incr("sampled_requests_count"))
+            except Exception:
+                pass
+        self.in_memory_metrics["sampled_requests_count"] += 1
+        return self.in_memory_metrics["sampled_requests_count"]
+
+    def increment_bypassed_requests(self) -> int:
+        """Increment count of requests that bypassed ML inspection to save compute."""
+        if self.redis:
+            try:
+                return int(self.redis.incr("bypassed_requests_count"))
+            except Exception:
+                pass
+        self.in_memory_metrics["bypassed_requests_count"] += 1
+        return self.in_memory_metrics["bypassed_requests_count"]
 
     def increment_total_requests(self) -> int:
         """Increment cumulative total requests count."""
@@ -219,10 +263,16 @@ class ThreatTracker:
         }
         """
         blocked_list = self.get_blocked_ips()
+        rate = self.get_sampling_rate()
         return {
             "total_requests": self.get_total_requests(),
             "blocked_ips_count": len(blocked_list),
             "blocked_ips_list": blocked_list,
+            "sampling_rate": rate,
+            "sampling_rate_pct": int(round(rate * 100)),
+            "sampled_requests_count": self.in_memory_metrics.get("sampled_requests_count", 0),
+            "bypassed_requests_count": self.in_memory_metrics.get("bypassed_requests_count", 0),
+            "compute_saved_pct": int(round((1.0 - rate) * 100)),
             "recent_alerts": self.get_recent_alerts(limit=25)
         }
 

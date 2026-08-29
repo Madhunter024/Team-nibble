@@ -80,7 +80,7 @@ def train_sqli_detector(output_path: str):
     y = [1] * len(sqli_payloads) + [0] * len(benign_payloads)
 
     pipeline = Pipeline([
-        ('tfidf', TfidfVectorizer(ngram_range=(1, 3), analyzer='char_wb')),
+        ('tfidf', TfidfVectorizer(ngram_range=(1, 3), analyzer='char_wb', max_features=3000, sublinear_tf=True)),
         ('clf', SGDClassifier(loss='log_loss', max_iter=1000, random_state=42))
     ])
 
@@ -103,7 +103,7 @@ def train_iso_forest(output_path: str):
 
     X_normal = np.column_stack([velocity, payload_size, header_entropy])
 
-    model = IsolationForest(contamination=0.05, random_state=42)
+    model = IsolationForest(n_estimators=30, contamination=0.05, random_state=42)
     model.fit(X_normal)
 
     joblib.dump(model, output_path)

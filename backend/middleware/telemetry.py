@@ -119,7 +119,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             except Exception as e:
                 logger.debug(f"Failed streaming telemetry to Redis: {e}")
 
-        # Async ML Anomaly Evaluation for active traffic
+        # Async ML Anomaly Evaluation for active traffic respecting active sampling rate
         excluded_ml_paths = [
             "/health", "/docs", "/openapi.json", "/redoc", "/",
             "/api/threat-metrics", "/api/v1/threat-metrics",
@@ -127,10 +127,18 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             "/.env", "/wp-admin", "/wp-login.php", "/.git/config", "/api/v1/debug/secrets"
         ]
         if evaluate_request_anomaly and endpoint not in excluded_ml_paths:
-            try:
-                asyncio.create_task(evaluate_request_anomaly(telemetry_data, redis_client))
-            except Exception as e:
-                logger.debug(f"Async ML anomaly check error: {e}")
+            import random
+            sampling_rate = tracker_instance.get_sampling_rate()
+            is_critical = telemetry_data.get("is_potential_sqli") or telemetry_data.get("is_potential_xss") or request_velocity > 30
+
+            if is_critical or (random.random() < sampling_rate):
+                tracker_instance.increment_sampled_requests()
+                try:
+                    asyncio.create_task(evaluate_request_anomaly(telemetry_data, redis_client))
+                except Exception as e:
+                    logger.debug(f"Async ML anomaly check error: {e}")
+            else:
+                tracker_instance.increment_bypassed_requests()
 
         response = await call_next(request)
         return response
