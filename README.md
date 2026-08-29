@@ -12,23 +12,26 @@ Nibdefender/
 ├── backend/               # FastAPI Security Gateway & Middleware
 │   ├── config.py          # Pydantic Settings configuration & env parser
 │   ├── main.py            # Gateway entry point, lifespan & route registration
-│   ├── middleware/        # Redis rate-limiting, IP blacklisting & PyJWT
+│   ├── middleware/        # Redis rate-limiting, IP blacklisting, PyJWT & Telemetry
 │   │   ├── __init__.py
 │   │   ├── rate_limiter.py # Sliding-window rate limiter & dynamic IP blocker
-│   │   ├── redis_rate_limit.py # ThreatTracker singleton & metric metrics
-│   │   └── jwt_auth.py
-│   ├── routes/            # Honeypot & dummy endpoints for attacker simulation
+│   │   ├── redis_rate_limit.py # ThreatTracker singleton & sampling state
+│   │   ├── telemetry.py    # Live request streaming & dynamic sampling dispatcher
+│   │   └── auth.py        # PyJWT verification & access tokens
+│   ├── routes/            # Target API endpoints, honeypot & simulation routes
 │   └── requirements.txt   # Backend Python dependencies
 ├── frontend/              # Next.js & Tremor Security Operations Dashboard
 │   ├── app/               # Next.js App Router (page.tsx, layout.tsx)
-│   ├── components/        # Dashboard shell & Scrolling ThreatFeed log
-│   ├── lib/               # API fetching utilities
+│   ├── components/        # Dashboard shell, TrafficChart, ThreatFeed & Sampling Controls
+│   ├── lib/               # API fetching & mock simulation utilities
 │   └── package.json
-├── ml_engine/             # Anomaly Detection & AI Incident Generator
-│   ├── train_model.py     # Synthetic data generation & IsolationForest trainer
-│   ├── inference.py       # Real-time anomaly detection pipeline
-│   ├── ai_reporter.py     # LangChain / OpenAI security report generator
-│   └── requirements.txt
+├── ml_engine/             # 100% Local Scikit-learn Threat Detection Engine
+│   ├── train_model.py     # Dual-model offline pipeline trainer (SQLi + IsolationForest)
+│   ├── inference.py       # Sub-15ms offline local inference pipeline
+│   ├── ai_reporter.py     # CISO Security Incident Report Generator
+│   ├── sqli_detector.joblib # Serialized TF-IDF + SGD Classifier pipeline
+│   ├── iso_forest.joblib    # Serialized IsolationForest anomaly detector
+│   └── requirements.txt   # ML dependencies (scikit-learn, numpy, joblib, pydantic)
 ├── scripts/               # Attacker Simulation Suite
 │   └── attacker.py        # Automated attack script (DDoS, SQLi, Auth Brute-force)
 ├── .env.example           # Shared environment variables
@@ -96,14 +99,14 @@ npm install
 npm run dev
 ```
 
-### 3. ML Engine Setup (Scikit-learn & LangChain)
+### 3. ML Engine Setup (100% Local Scikit-learn & Joblib)
 ```bash
 cd ml_engine
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python train_model.py  # Train IsolationForest model
-python inference.py    # Test anomaly prediction
+python train_model.py  # Train dual models (sqli_detector.joblib & iso_forest.joblib)
+python inference.py    # Verify sub-15ms offline local inference pipeline
 ```
 
 ### 4. Run Attacker Simulation
@@ -221,9 +224,10 @@ Returns operational security metrics, Redis-blocked IP sets, and security alerts
 ---
 
 ## 🔒 Key Features
-- **Redis IP Rate Limiting & Blocking:** Dynamic IP throttling via ZSET sliding window and automatic 1-hour blacklisting after repeated limit breaches.
-- **Pydantic Settings Management:** Centralized environment variable parsing from `.env`.
-- **JWT Authentication Guard:** Token validation and access control middleware.
-- **ML Anomaly Detection:** IsolationForest model trained on request velocity, entropy, and payload anomalies.
-- **AI-Powered Incident Reports:** LLM-generated analysis summarizing detected security incidents in human-readable reports.
-- **Real-Time Tremor Dashboard:** Live threat feed visualizer and operational security metrics.
+- **100% Local Machine Learning Engine:** Dual-model offline pipeline (`TfidfVectorizer` + `SGDClassifier` and `IsolationForest`) executing sub-15ms inference without external API dependencies.
+- **Redis IP Rate Limiting & Autonomous Blocking:** Dynamic IP throttling via ZSET sliding window and automatic 24-hour blacklisting after high-confidence threat detection or repeated rate breaches.
+- **Dynamic API Traffic Sampling:** Adjustable ML sampling rates (25%, 50%, 75%, 100%) with Redis state synchronization to balance inspection depth against CPU compute overhead.
+- **Pydantic Settings & Safety Guards:** Centralized environment parsing with loopback protection (`127.0.0.1`, `localhost`) to prevent self-blocking during red-team simulations.
+- **JWT Security Guard:** Token validation and RBAC claims verification middleware.
+- **CISO Security Incident Reports:** Automated local incident report generation providing actionable executive summaries for flagged attacks.
+- **Split-Screen War Room Dashboard:** Live Next.js & Tremor command center with real-time traffic charts, interactive attacker console, and active sampling controls.
