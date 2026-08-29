@@ -108,7 +108,7 @@ export const TrafficChart: React.FC<TrafficChartProps> = ({ data = [] }) => {
           categories={getCategories()}
           colors={getColors()}
           valueFormatter={(val: number) => `${val.toLocaleString()} req`}
-          yAxisWidth={42}
+          yAxisWidth={68}
           showGridLines={true}
           curveType="monotone"
           showLegend={false}

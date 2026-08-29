@@ -82,8 +82,8 @@ class ThreatTracker:
             try:
                 val = self.redis.get("total_requests")
                 return int(val) if val else 0
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"get_total_requests error: {e}")
         return self.in_memory_metrics["total_requests"]
 
     def is_ip_blocked(self, ip: str) -> bool:

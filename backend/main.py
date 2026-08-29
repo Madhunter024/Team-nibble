@@ -144,12 +144,20 @@ async def generate_mock_token(payload: TokenRequestPayload = Body(...)):
 
 @app.get("/api/threat-metrics")
 @app.get("/api/v1/threat-metrics")
-async def get_threat_metrics():
+async def get_threat_metrics(request: Request):
     """
     Frontend Interface Contract endpoint returning total requests, blocked IPs count,
     blocked IP list, and recent security alerts.
     """
-    return tracker_instance.get_metrics_snapshot()
+    snapshot = tracker_instance.get_metrics_snapshot()
+    redis_client = getattr(request.app.state, "redis", None)
+    if redis_client:
+        try:
+            total = await asyncio.wait_for(redis_client.get("total_requests"), timeout=1.0)
+            snapshot["total_requests"] = int(total) if total else 0
+        except Exception:
+            pass
+    return snapshot
 
 
 @app.get("/")

@@ -1,70 +1,135 @@
 import os
-import re
 import joblib
 import numpy as np
+import logging
+from typing import Dict, Any
 
-SUSPICIOUS_PATTERNS = [
-    r"'", r"--", r";", r"OR", r"AND", r"UNION", r"SELECT", r"DROP",
-    r"DELETE", r"INSERT", r"UPDATE", r"<script", r"javascript:",
-    r"eval\(", r"EXEC", r"BENCHMARK", r"SLEEP"
-]
+logger = logging.getLogger("nibdefender.ml_inference")
 
-def count_suspicious_tokens(payload: str) -> int:
-    """Count occurrence of SQLi/XSS patterns in payload."""
-    if not payload:
-        return 0
-    count = 0
-    payload_upper = str(payload).upper()
-    for pattern in SUSPICIOUS_PATTERNS:
-        matches = re.findall(pattern, payload_upper, re.IGNORECASE)
-        count += len(matches)
-    return count
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SQLI_MODEL_PATH = os.path.join(BASE_DIR, "sqli_detector.joblib")
+ISO_MODEL_PATH = os.path.join(BASE_DIR, "iso_forest.joblib")
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.pkl")
+_sqli_pipeline = None
+_iso_forest = None
 
-_model_artifact = None
 
-def _load_model_artifact():
-    """Load model.pkl if available."""
-    global _model_artifact
-    if _model_artifact is None and os.path.exists(MODEL_PATH):
+def _load_models():
+    """Safely loads sqli_detector.joblib and iso_forest.joblib using relative path resolution."""
+    global _sqli_pipeline, _iso_forest
+    if _sqli_pipeline is None and os.path.exists(SQLI_MODEL_PATH):
         try:
-            _model_artifact = joblib.load(MODEL_PATH)
+            _sqli_pipeline = joblib.load(SQLI_MODEL_PATH)
         except Exception as e:
-            print(f"⚠️ Warning: Failed to load model.pkl ({e}). Fallback logic will be used.")
-            _model_artifact = None
-    return _model_artifact
+            logger.warning(f"Failed to load sqli_detector.joblib from {SQLI_MODEL_PATH}: {e}")
+            _sqli_pipeline = None
+
+    if _iso_forest is None and os.path.exists(ISO_MODEL_PATH):
+        try:
+            _iso_forest = joblib.load(ISO_MODEL_PATH)
+        except Exception as e:
+            logger.warning(f"Failed to load iso_forest.joblib from {ISO_MODEL_PATH}: {e}")
+            _iso_forest = None
+
+
+def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
+    """
+    Perform 100% local, self-contained ML threat detection inference using Scikit-Learn.
+    
+    Returns structured dictionary:
+    {
+        "is_anomaly": bool,
+        "anomaly_score": float,
+        "threat_type": str,
+        "inference_engine": "Local Scikit-Learn Engine"
+    }
+    """
+    _load_models()
+
+    telemetry = telemetry or {}
+    if not raw_payload:
+        raw_payload = str(telemetry.get("raw_payload", "") or telemetry.get("endpoint", "") or "")
+
+    # 1. SQL Injection / Malicious Syntax Probability
+    sqli_prob = 0.0
+    if _sqli_pipeline is not None and raw_payload:
+        try:
+            probs = _sqli_pipeline.predict_proba([raw_payload])[0]
+            classes = list(_sqli_pipeline.classes_)
+            if 1 in classes:
+                sqli_prob = float(probs[classes.index(1)])
+        except Exception as e:
+            logger.debug(f"SQLi model prediction error: {e}")
+
+    # Fallback heuristic check if keyword present
+    lower_payload = raw_payload.lower()
+    known_attack_patterns = ["' or '1'='1", "union select", "drop table", "<script>", "javascript:", "or 1=1", "admin' --"]
+    if any(pattern in lower_payload for pattern in known_attack_patterns):
+        sqli_prob = max(sqli_prob, 0.95)
+
+    # 2. IsolationForest Anomaly Prediction on [request_velocity, payload_size, header_entropy]
+    velocity = float(telemetry.get("request_velocity", 1))
+    payload_size = float(telemetry.get("payload_size", len(raw_payload)))
+    header_entropy = float(telemetry.get("header_entropy", 3.0))
+
+    iso_pred = 1
+    decision_score = 0.0
+
+    if _iso_forest is not None:
+        try:
+            features = np.array([[velocity, payload_size, header_entropy]])
+            iso_pred = int(_iso_forest.predict(features)[0])  # -1 for anomaly, 1 for normal
+            decision_score = float(_iso_forest.decision_function(features)[0])
+        except Exception as e:
+            logger.debug(f"IsolationForest prediction error: {e}")
+
+    if velocity > 30 or payload_size > 5000:
+        iso_pred = -1
+
+    # 3. Combine evaluation rules: Flag as anomaly if sqli_prob > 0.7 or iso_pred == -1
+    is_anomaly = bool(sqli_prob > 0.7 or iso_pred == -1)
+
+    threat_type = "NORMAL"
+    if sqli_prob > 0.7:
+        threat_type = "SQL_INJECTION"
+    elif velocity > 30:
+        threat_type = "HIGH_VELOCITY_DDOS"
+    elif iso_pred == -1:
+        threat_type = "ISOLATION_FOREST_ANOMALY"
+
+    # Compute normalized anomaly score (0.0 to 1.0)
+    if threat_type == "SQL_INJECTION":
+        anomaly_score = max(sqli_prob, 0.85)
+    elif threat_type == "HIGH_VELOCITY_DDOS":
+        anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
+    elif iso_pred == -1:
+        anomaly_score = min(0.95, max(0.75, 0.85 - decision_score))
+    else:
+        anomaly_score = max(0.15, round(sqli_prob, 4))
+
+    return {
+        "is_anomaly": is_anomaly,
+        "anomaly_score": round(float(anomaly_score), 4),
+        "threat_type": threat_type,
+        "inference_engine": "Local Scikit-Learn Engine"
+    }
+
 
 def detect_anomaly(payload: str, request_rate: int) -> bool:
-    """
-    Interface Contract:
-    Signature: detect_anomaly(payload: str, request_rate: int) -> bool
-    Returns True if anomalous/malicious, False if normal.
-    """
-    payload_str = payload if payload is not None else ""
-    payload_len = len(payload_str)
-    suspicious_count = count_suspicious_tokens(payload_str)
+    """Backward compatibility wrapper."""
+    telemetry = {
+        "request_velocity": request_rate,
+        "payload_size": len(payload or ""),
+        "header_entropy": 3.0
+    }
+    result = detect_threat_locally(telemetry, raw_payload=payload)
+    return result["is_anomaly"]
 
-    if suspicious_count > 0 or request_rate > 50 or payload_len > 4000:
-        return True
-
-    artifact = _load_model_artifact()
-
-    if artifact and 'model' in artifact and 'scaler' in artifact:
-        try:
-            model = artifact['model']
-            scaler = artifact['scaler']
-            X = np.array([[float(payload_len), float(request_rate), float(suspicious_count)]])
-            X_scaled = scaler.transform(X)
-            prediction = model.predict(X_scaled)[0]
-            # IsolationForest returns -1 for anomaly, 1 for normal
-            is_anomaly = bool(prediction == -1 and (suspicious_count > 0 or request_rate > 35 or payload_len > 800))
-            return is_anomaly
-        except Exception as e:
-            pass
-
-    return False
 
 if __name__ == "__main__":
-    print("Normal test:", detect_anomaly("username=john", 15))
-    print("SQLi test:", detect_anomaly("username=' OR '1'='1", 10))
+    test_telemetry_normal = {"request_velocity": 5, "payload_size": 120, "header_entropy": 3.2}
+    test_telemetry_ddos = {"request_velocity": 120, "payload_size": 250, "header_entropy": 3.5}
+    
+    print("Normal test:", detect_threat_locally(test_telemetry_normal, "search?q=laptop"))
+    print("SQLi test:", detect_threat_locally(test_telemetry_normal, "username=' OR '1'='1"))
+    print("DDoS test:", detect_threat_locally(test_telemetry_ddos, "search?q=ddos"))

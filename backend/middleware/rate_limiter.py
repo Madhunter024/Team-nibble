@@ -49,6 +49,9 @@ async def block_ip(redis_client, ip: str, duration_seconds: int = 3600) -> None:
     """
     Programmatically blacklists an IP address in Redis and in-memory fallback.
     """
+    if ip in ["127.0.0.1", "localhost", "::1"]:
+        return
+
     blacklist_key = f"blacklist:{ip}"
     if redis_client:
         try:
@@ -93,6 +96,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def is_blacklisted(self, redis_client, ip: str) -> bool:
         """Check if client IP is blacklisted in Redis or in-memory fallback."""
+        if ip in ["127.0.0.1", "localhost", "::1"]:
+            return False
         current_time = time.time()
 
         # Check in-memory expiry

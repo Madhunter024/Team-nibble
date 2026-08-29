@@ -1,94 +1,121 @@
 import os
-import re
 import joblib
 import numpy as np
-import pandas as pd
+from sklearn.pipeline import Pipeline
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import SGDClassifier
 from sklearn.ensemble import IsolationForest
-from sklearn.preprocessing import StandardScaler
 
-SUSPICIOUS_PATTERNS = [
-    r"'", r"--", r";", r"OR", r"AND", r"UNION", r"SELECT", r"DROP",
-    r"DELETE", r"INSERT", r"UPDATE", r"<script", r"javascript:",
-    r"eval\(", r"EXEC", r"BENCHMARK", r"SLEEP"
-]
-
-def count_suspicious_tokens(payload: str) -> int:
-    """Count occurrence of SQLi/XSS suspicious patterns in payload."""
-    if not payload:
-        return 0
-    count = 0
-    payload_upper = str(payload).upper()
-    for pattern in SUSPICIOUS_PATTERNS:
-        matches = re.findall(pattern, payload_upper, re.IGNORECASE)
-        count += len(matches)
-    return count
-
-def generate_synthetic_data(num_samples: int = 1500) -> pd.DataFrame:
+def train_sqli_detector(output_path: str):
     """
-    Generate mock normal vs anomalous API payload data:
-    - Normal: short payloads, low request rates, 0 suspicious tokens.
-    - Anomalous: long payloads, high rate spikes, SQLi/XSS tokens.
+    Trains a character n-gram TF-IDF + SGDClassifier pipeline for SQL Injection and malicious syntax detection.
+    """
+    sqli_payloads = [
+        "' OR '1'='1",
+        "' OR 1=1 --",
+        "admin' --",
+        "' OR 'a'='a",
+        "1; DROP TABLE users",
+        "UNION SELECT username, password FROM users",
+        "UNION SELECT NULL, NULL, NULL",
+        "' UNION SELECT 1, @@version --",
+        "1' OR '1'='1' --",
+        "<script>alert(1)</script>",
+        "javascript:alert('xss')",
+        "SELECT * FROM accounts WHERE id = 1 OR 1=1",
+        "'; EXEC xp_cmdshell('dir') --",
+        "1 AND 1=1",
+        "1' AND '1'='1",
+        "admin' #",
+        "' HAVING 1=1 --",
+        "' GROUP BY username HAVING 1=1 --",
+        "1 PROCEDURE ANALYSE()",
+        "1 OR SLEEP(5)#",
+        "1 BENCHMARK(1000000,MD5(1))",
+        "ORDER BY 1--",
+        "ORDER BY 10--",
+        "<img src=x onerror=alert(1)>",
+        "'; DELETE FROM logs WHERE 1=1 --",
+        "'; UPDATE users SET role='admin' WHERE username='attacker' --",
+        "admin' OR '1'='1'/*",
+        "1' OR 1=1 LIMIT 1 --",
+        "' OR ''='",
+        "1' UNION ALL SELECT NULL,NULL,NULL--",
+    ]
+
+    benign_payloads = [
+        "laptop",
+        "smartphone",
+        "wireless headphones",
+        "username=john_doe&action=login",
+        "search?q=python+programming",
+        "category=electronics&page=2",
+        "user_id=1024",
+        "endpoint=/api/v1/search?q=test",
+        "hello world",
+        "admin",
+        "secret123",
+        "page=1&limit=20",
+        "item_id=abc-123-xyz",
+        "filter=active&sort=asc",
+        "query=security+gateway",
+        "format=json&compress=true",
+        "session_token=abc123def456",
+        "title=getting+started+with+fastapi",
+        "ref=homepage&source=nav",
+        "lang=en-US",
+        "view=grid&theme=dark",
+        "product_name=keyboard",
+        "status=success",
+        "tags=python,machine-learning,security",
+        "comment=Great article! Thanks for sharing.",
+        "email=user@example.com",
+        "firstname=Alice&lastname=Smith",
+        "order_by=date&dir=desc",
+        "tab=overview",
+        "city=New+York&zip=10001",
+    ]
+
+    X = sqli_payloads + benign_payloads
+    y = [1] * len(sqli_payloads) + [0] * len(benign_payloads)
+
+    pipeline = Pipeline([
+        ('tfidf', TfidfVectorizer(ngram_range=(1, 3), analyzer='char_wb')),
+        ('clf', SGDClassifier(loss='log_loss', max_iter=1000, random_state=42))
+    ])
+
+    pipeline.fit(X, y)
+    joblib.dump(pipeline, output_path)
+    print(f"✅ SQLi Classifier successfully trained and saved to: {output_path}")
+
+
+def train_iso_forest(output_path: str):
+    """
+    Trains an IsolationForest model on normal request baseline features: [request_velocity, payload_size, header_entropy].
     """
     np.random.seed(42)
-    n_normal = int(num_samples * 0.85)
-    n_anomaly = num_samples - n_normal
+    n_samples = 1000
 
-    # Normal traffic
-    normal_lengths = np.random.uniform(low=5, high=300, size=n_normal)
-    normal_rates = np.random.uniform(low=1, high=25, size=n_normal)
-    normal_tokens = np.zeros(n_normal)
+    # Normal baseline feature distributions
+    velocity = np.random.uniform(low=1, high=15, size=n_samples)
+    payload_size = np.random.uniform(low=10, high=1500, size=n_samples)
+    header_entropy = np.random.uniform(low=2.0, high=4.5, size=n_samples)
 
-    # Anomalous traffic
-    anomaly_lengths = np.random.uniform(low=600, high=50000, size=n_anomaly)
-    anomaly_rates = np.random.uniform(low=60, high=1000, size=n_anomaly)
-    anomaly_tokens = np.random.randint(low=1, high=10, size=n_anomaly)
+    X_normal = np.column_stack([velocity, payload_size, header_entropy])
 
-    df_normal = pd.DataFrame({
-        'payload_len': normal_lengths,
-        'request_rate': normal_rates,
-        'suspicious_tokens': normal_tokens,
-        'label': 0
-    })
+    model = IsolationForest(contamination=0.05, random_state=42)
+    model.fit(X_normal)
 
-    df_anomaly = pd.DataFrame({
-        'payload_len': anomaly_lengths,
-        'request_rate': anomaly_rates,
-        'suspicious_tokens': anomaly_tokens,
-        'label': 1
-    })
+    joblib.dump(model, output_path)
+    print(f"✅ IsolationForest Anomaly Detector successfully trained and saved to: {output_path}")
 
-    df = pd.concat([df_normal, df_anomaly], ignore_index=True)
-    return df.sample(frac=1.0, random_state=42).reset_index(drop=True)
-
-def train_and_save_model() -> str:
-    """Train IsolationForest model and save to ml_engine/model.pkl."""
-    print("🤖 Generating mock normal and anomalous payload data...")
-    df = generate_synthetic_data()
-
-    feature_cols = ['payload_len', 'request_rate', 'suspicious_tokens']
-    X = df[feature_cols]
-
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X.values)
-
-    print("🌲 Training IsolationForest Anomaly Detection Model...")
-    model = IsolationForest(
-        n_estimators=100,
-        contamination=0.15,
-        random_state=42
-    )
-    model.fit(X_scaled)
-
-    artifact = {
-        'model': model,
-        'scaler': scaler,
-        'feature_cols': feature_cols
-    }
-
-    model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
-    joblib.dump(artifact, model_path)
-    print(f"✅ Model saved successfully to {model_path}")
-    return model_path
 
 if __name__ == "__main__":
-    train_and_save_model()
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    sqli_path = os.path.join(base_dir, "sqli_detector.joblib")
+    iso_path = os.path.join(base_dir, "iso_forest.joblib")
+
+    print("🚀 Initializing dual-model offline training pipeline...")
+    train_sqli_detector(sqli_path)
+    train_iso_forest(iso_path)
+    print("✨ Dual-model offline pipeline training complete!")

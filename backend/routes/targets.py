@@ -7,11 +7,11 @@ from fastapi import APIRouter, Request, Query, Body, HTTPException, status
 from pydantic import BaseModel, Field
 
 try:
-    from backend.middleware.rate_limiter import get_client_ip
+    from backend.middleware.rate_limiter import get_client_ip, block_ip
     from backend.middleware.auth import create_access_token
     from backend.middleware.redis_rate_limit import tracker_instance
 except ImportError:
-    from middleware.rate_limiter import get_client_ip
+    from middleware.rate_limiter import get_client_ip, block_ip
     from middleware.auth import create_access_token
     from middleware.redis_rate_limit import tracker_instance
 
@@ -68,11 +68,13 @@ async def login_target(request: Request, credentials: LoginRequest = Body(...)):
     # Check for SQL Injection syntax
     has_sqli = any(p in username for p in SQLI_PATTERNS) or any(p in password for p in SQLI_PATTERNS)
     if has_sqli:
+        redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
+        await block_ip(redis_client, client_ip, duration_seconds=3600)
+
         tracker_instance.add_alert(
             severity="HIGH",
             message=f"SQL Injection attack detected in login payload from IP {client_ip}. Username: '{username}'"
         )
-        redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
         if redis_client:
             try:
                 event = json.dumps({
@@ -130,11 +132,13 @@ async def search_target(request: Request, q: str = Query(..., examples=["laptop"
 
     if is_sqli or is_xss:
         attack_type = "SQL_INJECTION" if is_sqli else "XSS_ATTACK"
+        redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
+        await block_ip(redis_client, client_ip, duration_seconds=3600)
+
         tracker_instance.add_alert(
             severity="HIGH",
             message=f"{attack_type} pattern detected in search parameter 'q' from IP {client_ip}: '{q}'"
         )
-        redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
         if redis_client:
             try:
                 event = json.dumps({

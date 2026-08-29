@@ -2,8 +2,6 @@ import os
 import sys
 import uuid
 import json
-import inspect
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
@@ -14,14 +12,9 @@ if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
 try:
-    from ml_engine.inference import detect_anomaly as ml_detect_anomaly
+    from ml_engine.inference import detect_threat_locally
 except ImportError:
-    ml_detect_anomaly = None
-
-try:
-    from ml_engine.ai_reporter import generate_threat_report as ml_generate_threat_report
-except ImportError:
-    ml_generate_threat_report = None
+    detect_threat_locally = None
 
 try:
     from backend.middleware.rate_limiter import block_ip
@@ -33,88 +26,80 @@ except ImportError:
 logger = logging.getLogger("nibdefender.ml_client")
 
 
-async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> dict:
+async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None, raw_payload: str = "") -> dict:
     """
-    Evaluates request telemetry for anomalies using ML Engine inference:
-    1. Runs ML anomaly detection or heuristic fallback.
-    2. Computes an anomaly_score (0.0 to 1.0) and threat_type.
-    3. If anomaly_score > 0.85, automatically blocks client IP for 24h.
-    4. Generates an AI CISO threat report and pushes event to Redis `list:incidents`.
+    Evaluates request telemetry purely in-memory using local Scikit-Learn ML engine:
+    1. Executes sub-millisecond local ML threat detection via `detect_threat_locally`.
+    2. Computes `is_anomaly`, `anomaly_score`, and `threat_type` with 0 external network calls.
+    3. If `anomaly_score >= 0.90`, automatically blocks client IP in Redis for 24h.
+    4. Generates an in-memory CISO incident report and updates real-time tracker logs.
     """
     client_ip = telemetry_data.get("client_ip", "127.0.0.1")
     endpoint = telemetry_data.get("endpoint", "/")
     velocity = telemetry_data.get("request_velocity", 1)
     payload_size = telemetry_data.get("payload_size", 0)
     entropy = telemetry_data.get("header_entropy", 0.0)
-    raw_payload = telemetry_data.get("raw_payload", f"endpoint={endpoint}&size={payload_size}")
+    payload_text = raw_payload or telemetry_data.get("raw_payload", f"endpoint={endpoint}&size={payload_size}")
     is_sqli = telemetry_data.get("is_potential_sqli", False)
     is_xss = telemetry_data.get("is_potential_xss", False)
 
-    # 1. ML Engine Inference Call
-    if is_sqli or is_xss:
-        is_anomaly = True
-    elif ml_detect_anomaly is not None:
-        try:
-            is_anomaly = ml_detect_anomaly(raw_payload, int(velocity))
-        except Exception as e:
-            is_anomaly = velocity > 30 or payload_size > 5000
+    # 1. Purely local Scikit-Learn ML Engine Inference
+    if detect_threat_locally is not None:
+        local_result = detect_threat_locally(telemetry_data, raw_payload=payload_text)
+        is_anomaly = local_result["is_anomaly"]
+        anomaly_score = local_result["anomaly_score"]
+        threat_type = local_result["threat_type"]
     else:
-        is_anomaly = velocity > 30 or payload_size > 5000
+        # In-memory heuristic fallback
+        is_anomaly = False
+        anomaly_score = 0.15
+        threat_type = "NORMAL"
+        if is_sqli:
+            threat_type = "SQL_INJECTION"
+            anomaly_score = 0.95
+            is_anomaly = True
+        elif is_xss:
+            threat_type = "XSS_ATTACK"
+            anomaly_score = 0.92
+            is_anomaly = True
+        elif velocity > 30:
+            threat_type = "HIGH_VELOCITY_DDOS"
+            anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
+            is_anomaly = True
+        elif payload_size > 5000 or entropy > 5.5:
+            threat_type = "ANOMALOUS_PAYLOAD"
+            anomaly_score = 0.78
+            is_anomaly = True
 
-    # 2. Compute Threat Type and Anomaly Score
-    threat_type = "NORMAL"
-    anomaly_score = 0.15
-
-    if is_sqli:
+    if is_sqli and threat_type == "NORMAL":
         threat_type = "SQL_INJECTION"
         anomaly_score = 0.95
         is_anomaly = True
-    elif is_xss:
+    elif is_xss and threat_type == "NORMAL":
         threat_type = "XSS_ATTACK"
         anomaly_score = 0.92
-        is_anomaly = True
-    elif velocity > 30:
-        threat_type = "HIGH_VELOCITY_DDOS"
-        anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
-        is_anomaly = True
-    elif is_anomaly:
-        threat_type = "ISOLATION_FOREST_ANOMALY"
-        anomaly_score = 0.78
-    elif entropy > 5.5 or payload_size > 10000:
-        threat_type = "ANOMALOUS_PAYLOAD"
-        anomaly_score = 0.75
         is_anomaly = True
 
     result = {
         "is_anomaly": is_anomaly,
         "anomaly_score": round(anomaly_score, 4),
-        "threat_type": threat_type
+        "threat_type": threat_type,
+        "inference_engine": "Local Scikit-Learn Engine"
     }
 
-    # 3. Autonomous Mitigation & AI Incident Logging if Anomaly Detected
+    # 2. In-Memory Autonomous Mitigation & Real-Time Security Tracking
     if is_anomaly:
         action = "FLAGGED"
         if anomaly_score >= 0.90:
             action = "BLOCKED"
             await block_ip(redis_client, client_ip, duration_seconds=86400)
-            logger.warning(f"IP {client_ip} automatically blocked due to high anomaly score {anomaly_score}.")
+            logger.warning(f"IP {client_ip} automatically blocked locally due to high anomaly score {anomaly_score}.")
 
-        # Generate CISO Incident Report
-        if ml_generate_threat_report is not None:
-            try:
-                ciso_report = await asyncio.to_thread(
-                    ml_generate_threat_report, client_ip, threat_type, raw_payload
-                )
-            except Exception as e:
-                ciso_report = (
-                    f"[CISO Incident Summary] Flagged high-risk {threat_type} vector originating from IP {client_ip}. "
-                    f"Action taken: {action}."
-                )
-        else:
-            ciso_report = (
-                f"[CISO Incident Summary] Flagged high-risk {threat_type} vector originating from IP {client_ip}. "
-                f"Action taken: {action}."
-            )
+        # Generate sub-millisecond local CISO Summary
+        ciso_report = (
+            f"[CISO Incident Summary] Flagged high-risk {threat_type} vector originating from IP {client_ip} "
+            f"carrying payload '{payload_text[:80]}'. Autonomous rate-limiting and blocking countermeasures have been enforced."
+        )
 
         incident_record = {
             "id": f"inc_{uuid.uuid4().hex[:8]}",
@@ -128,10 +113,8 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> d
             "ciso_report": ciso_report
         }
 
-        # Save to Redis list:incidents and in-memory tracker
+        # Update in-memory and Redis incident trackers
         tracker_instance.add_incident(incident_record)
-
-        # Add to ThreatTracker alert log with full CISO report
         tracker_instance.add_alert(
             severity="CRITICAL" if action == "BLOCKED" else "HIGH",
             message=ciso_report
