@@ -5,8 +5,13 @@ from typing import Optional, Dict, Any
 from fastapi import Request, HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-SECRET_KEY = os.getenv("SECRET_KEY", "nibdefender_super_secret_jwt_key_2026")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
+try:
+    from backend.config import settings
+except ImportError:
+    from config import settings
+
+SECRET_KEY = getattr(settings, "JWT_SECRET_KEY", "nibdefender_super_secret_jwt_key_2026_production")
+ALGORITHM = getattr(settings, "JWT_ALGORITHM", "HS256")
 
 security = HTTPBearer(auto_error=False)
 

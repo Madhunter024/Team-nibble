@@ -39,6 +39,12 @@ def get_client_ip(request: Request) -> str:
     return "127.0.0.1"
 
 
+async def _safe_await(val):
+    if inspect.isawaitable(val):
+        return await val
+    return val
+
+
 async def block_ip(redis_client, ip: str, duration_seconds: int = 3600) -> None:
     """
     Programmatically blacklists an IP address in Redis and in-memory fallback.
@@ -46,12 +52,8 @@ async def block_ip(redis_client, ip: str, duration_seconds: int = 3600) -> None:
     blacklist_key = f"blacklist:{ip}"
     if redis_client:
         try:
-            if inspect.iscoroutinefunction(getattr(redis_client, "set", None)):
-                await redis_client.set(blacklist_key, "1", ex=duration_seconds)
-                await redis_client.sadd("blocked_ips_set", ip)
-            else:
-                redis_client.set(blacklist_key, "1", ex=duration_seconds)
-                redis_client.sadd("blocked_ips_set", ip)
+            await _safe_await(redis_client.set(blacklist_key, "1", ex=duration_seconds))
+            await _safe_await(redis_client.sadd("blocked_ips_set", ip))
         except Exception as e:
             logger.warning(f"Redis error during block_ip for {ip}: {e}")
 
@@ -66,14 +68,9 @@ async def unblock_ip(redis_client, ip: str) -> None:
     violations_key = f"violations:{ip}"
     if redis_client:
         try:
-            if inspect.iscoroutinefunction(getattr(redis_client, "delete", None)):
-                await redis_client.delete(blacklist_key)
-                await redis_client.delete(violations_key)
-                await redis_client.srem("blocked_ips_set", ip)
-            else:
-                redis_client.delete(blacklist_key)
-                redis_client.delete(violations_key)
-                redis_client.srem("blocked_ips_set", ip)
+            await _safe_await(redis_client.delete(blacklist_key))
+            await _safe_await(redis_client.delete(violations_key))
+            await _safe_await(redis_client.srem("blocked_ips_set", ip))
         except Exception as e:
             logger.warning(f"Redis error during unblock_ip for {ip}: {e}")
 
@@ -111,14 +108,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if redis_client:
             try:
                 blacklist_key = f"blacklist:{ip}"
-                if inspect.iscoroutinefunction(getattr(redis_client, "get", None)):
-                    val = await redis_client.get(blacklist_key)
-                    if val is not None:
-                        return True
-                else:
-                    val = redis_client.get(blacklist_key)
-                    if val is not None:
-                        return True
+                val = await _safe_await(redis_client.get(blacklist_key))
+                if val is not None:
+                    return True
             except Exception as e:
                 logger.warning(f"Redis error checking blacklist for {ip}: {e}")
 
@@ -140,30 +132,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if redis_client:
             try:
-                if inspect.iscoroutinefunction(getattr(redis_client, "pipeline", None)):
-                    pipe = redis_client.pipeline()
-                    pipe.zremrangebyscore(zset_key, 0, current_time - window_seconds)
-                    pipe.zadd(zset_key, {str(current_time): current_time})
-                    pipe.zcard(zset_key)
-                    pipe.expire(zset_key, window_seconds)
-                    results = await pipe.execute()
-                    request_count = results[2]
-                else:
-                    pipe = redis_client.pipeline()
-                    pipe.zremrangebyscore(zset_key, 0, current_time - window_seconds)
-                    pipe.zadd(zset_key, {str(current_time): current_time})
-                    pipe.zcard(zset_key)
-                    pipe.expire(zset_key, window_seconds)
-                    results = pipe.execute()
-                    request_count = results[2]
+                pipe = redis_client.pipeline()
+                pipe.zremrangebyscore(zset_key, 0, current_time - window_seconds)
+                pipe.zadd(zset_key, {str(current_time): current_time})
+                pipe.zcard(zset_key)
+                pipe.expire(zset_key, window_seconds)
+                results = await _safe_await(pipe.execute())
+                request_count = results[2]
 
                 if request_count > rate_limit_requests:
-                    if inspect.iscoroutinefunction(getattr(redis_client, "incr", None)):
-                        violation_count = await redis_client.incr(violations_key)
-                        await redis_client.expire(violations_key, window_seconds * 10)
-                    else:
-                        violation_count = redis_client.incr(violations_key)
-                        redis_client.expire(violations_key, window_seconds * 10)
+                    violation_count = await _safe_await(redis_client.incr(violations_key))
+                    await _safe_await(redis_client.expire(violations_key, window_seconds * 10))
 
                 return request_count <= rate_limit_requests, request_count, violation_count
             except Exception as e:
@@ -185,8 +164,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         path = request.url.path
 
-        # Excluded paths: /health, OpenAPI docs (/docs, /openapi.json, /redoc), root
-        if path in ["/health", "/docs", "/openapi.json", "/redoc", "/"]:
+        # Excluded paths: health, docs, root, dashboard metrics/threat observability, honeypot traps
+        DASHBOARD_PATHS = [
+            "/health", "/docs", "/openapi.json", "/redoc", "/",
+            "/api/threat-metrics", "/api/v1/threat-metrics",
+            "/api/v1/threats/feed", "/api/v1/threats/stats",
+            "/api/v1/threats/blocked-ips", "/api/v1/threats/unblock"
+        ]
+        HONEYPOT_PATHS = ["/.env", "/wp-admin", "/wp-login.php", "/.git/config", "/api/v1/debug/secrets"]
+        if path in DASHBOARD_PATHS or path in HONEYPOT_PATHS:
             return await call_next(request)
 
         client_ip = get_client_ip(request)

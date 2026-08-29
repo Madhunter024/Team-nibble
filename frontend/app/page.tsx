@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Dashboard } from '../components/Dashboard';
 import {
   fetchThreatMetrics,
+  unblockIpApi,
+  triggerLiveAttackApi,
   ThreatMetrics,
   ThreatAlert,
   ApiResponseMeta,
@@ -98,16 +100,20 @@ export default function Home() {
   }, [pollData]);
 
   // Handler for unblocking an IP from the dashboard
-  const handleUnblockIp = useCallback((ipToUnblock: string) => {
+  const handleUnblockIp = useCallback(async (ipToUnblock: string) => {
     setMetrics((prev) => ({
       ...prev,
       blocked_ips_count: Math.max(0, prev.blocked_ips_count - 1),
       blocked_ips_list: prev.blocked_ips_list.filter((ip) => ip !== ipToUnblock),
     }));
+    await unblockIpApi(ipToUnblock);
   }, []);
 
   // Handler for triggering an immediate attack simulation spike
-  const handleTriggerSimulatedAttack = useCallback(() => {
+  const handleTriggerSimulatedAttack = useCallback(async () => {
+    // Trigger real attacks against live backend if available
+    triggerLiveAttackApi('sqli');
+
     const randomIp = `185.220.${Math.floor(Math.random() * 200) + 10}.${Math.floor(Math.random() * 250) + 1}`;
     const spikeAlert: ThreatAlert = {
       id: `ALT-SIM-${Date.now().toString().slice(-4)}`,

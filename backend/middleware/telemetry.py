@@ -2,6 +2,7 @@ import time
 import math
 import json
 import inspect
+import asyncio
 import logging
 from typing import Dict, Any, Optional
 from fastapi import Request
@@ -16,6 +17,14 @@ try:
     from backend.middleware.redis_rate_limit import tracker_instance
 except ImportError:
     from middleware.redis_rate_limit import tracker_instance
+
+try:
+    from backend.services.ml_client import evaluate_request_anomaly
+except ImportError:
+    try:
+        from services.ml_client import evaluate_request_anomaly
+    except ImportError:
+        evaluate_request_anomaly = None
 
 logger = logging.getLogger("nibdefender.telemetry")
 
@@ -71,15 +80,16 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         if redis_client:
             try:
                 zset_key = f"rate_limit:{client_ip}"
-                if inspect.iscoroutinefunction(getattr(redis_client, "zcount", None)):
-                    vel = await redis_client.zcount(zset_key, current_time_sec - 10, "+inf")
-                    request_velocity = max(1, vel)
-                elif hasattr(redis_client, "zcount"):
-                    vel = redis_client.zcount(zset_key, current_time_sec - 10, "+inf")
+                zcount_fn = getattr(redis_client, "zcount", None)
+                if zcount_fn:
+                    vel = zcount_fn(zset_key, current_time_sec - 10, "+inf")
+                    if inspect.isawaitable(vel):
+                        vel = await vel
                     request_velocity = max(1, vel)
             except Exception as e:
                 logger.debug(f"Error reading velocity from Redis: {e}")
 
+        query_str = str(request.url.query) if request.url.query else ""
         telemetry_data = {
             "client_ip": client_ip,
             "endpoint": endpoint,
@@ -87,7 +97,10 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             "timestamp": timestamp_ms,
             "payload_size": payload_size,
             "header_entropy": header_entropy,
-            "request_velocity": request_velocity
+            "request_velocity": request_velocity,
+            "raw_payload": f"{endpoint}?{query_str}" if query_str else endpoint,
+            "is_potential_sqli": any(p in query_str.upper() for p in ["' OR '1'='1", "UNION SELECT", "DROP TABLE", "--", "';"]),
+            "is_potential_xss": any(p in query_str.lower() for p in ["<script>", "</script>", "javascript:", "onerror="])
         }
 
         # Attach telemetry to request.state for downstream route handlers / ML inspection
@@ -97,14 +110,27 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
         if redis_client:
             try:
                 telemetry_json = json.dumps(telemetry_data)
-                if inspect.iscoroutinefunction(getattr(redis_client, "lpush", None)):
-                    await redis_client.lpush("stream:telemetry", telemetry_json)
-                    await redis_client.ltrim("stream:telemetry", 0, 999)
-                elif hasattr(redis_client, "lpush"):
-                    redis_client.lpush("stream:telemetry", telemetry_json)
-                    redis_client.ltrim("stream:telemetry", 0, 999)
+                lpush_res = getattr(redis_client, "lpush", lambda *args: None)("stream:telemetry", telemetry_json)
+                if inspect.isawaitable(lpush_res):
+                    await lpush_res
+                ltrim_res = getattr(redis_client, "ltrim", lambda *args: None)("stream:telemetry", 0, 999)
+                if inspect.isawaitable(ltrim_res):
+                    await ltrim_res
             except Exception as e:
                 logger.debug(f"Failed streaming telemetry to Redis: {e}")
+
+        # Async ML Anomaly Evaluation for active traffic
+        excluded_ml_paths = [
+            "/health", "/docs", "/openapi.json", "/redoc", "/",
+            "/api/threat-metrics", "/api/v1/threat-metrics",
+            "/api/v1/threats/feed", "/api/v1/threats/stats", "/api/v1/threats/blocked-ips",
+            "/.env", "/wp-admin", "/wp-login.php", "/.git/config", "/api/v1/debug/secrets"
+        ]
+        if evaluate_request_anomaly and endpoint not in excluded_ml_paths:
+            try:
+                asyncio.create_task(evaluate_request_anomaly(telemetry_data, redis_client))
+            except Exception as e:
+                logger.debug(f"Async ML anomaly check error: {e}")
 
         response = await call_next(request)
         return response

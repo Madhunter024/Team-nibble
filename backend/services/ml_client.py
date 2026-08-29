@@ -51,14 +51,15 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> d
     is_xss = telemetry_data.get("is_potential_xss", False)
 
     # 1. ML Engine Inference Call
-    if ml_detect_anomaly is not None:
+    if is_sqli or is_xss:
+        is_anomaly = True
+    elif ml_detect_anomaly is not None:
         try:
             is_anomaly = ml_detect_anomaly(raw_payload, int(velocity))
         except Exception as e:
-            logger.warning(f"Error running ML detect_anomaly ({e}). Using heuristic fallback.")
-            is_anomaly = velocity > 15 or payload_size > 5000 or is_sqli or is_xss
+            is_anomaly = velocity > 30 or payload_size > 5000
     else:
-        is_anomaly = velocity > 15 or payload_size > 5000 or is_sqli or is_xss
+        is_anomaly = velocity > 30 or payload_size > 5000
 
     # 2. Compute Threat Type and Anomaly Score
     threat_type = "NORMAL"
@@ -70,16 +71,16 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> d
         is_anomaly = True
     elif is_xss:
         threat_type = "XSS_ATTACK"
-        anomaly_score = 0.90
+        anomaly_score = 0.92
         is_anomaly = True
-    elif velocity > 20:
+    elif velocity > 30:
         threat_type = "HIGH_VELOCITY_DDOS"
-        anomaly_score = min(0.99, 0.5 + (velocity / 50.0))
+        anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
         is_anomaly = True
     elif is_anomaly:
         threat_type = "ISOLATION_FOREST_ANOMALY"
-        anomaly_score = 0.88
-    elif entropy > 5.2 or payload_size > 10000:
+        anomaly_score = 0.78
+    elif entropy > 5.5 or payload_size > 10000:
         threat_type = "ANOMALOUS_PAYLOAD"
         anomaly_score = 0.75
         is_anomaly = True
@@ -93,7 +94,7 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> d
     # 3. Autonomous Mitigation & AI Incident Logging if Anomaly Detected
     if is_anomaly:
         action = "FLAGGED"
-        if anomaly_score > 0.85:
+        if anomaly_score >= 0.90:
             action = "BLOCKED"
             await block_ip(redis_client, client_ip, duration_seconds=86400)
             logger.warning(f"IP {client_ip} automatically blocked due to high anomaly score {anomaly_score}.")
@@ -127,18 +128,8 @@ async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None) -> d
             "ciso_report": ciso_report
         }
 
-        # Save to Redis list:incidents
-        if redis_client:
-            try:
-                rec_json = json.dumps(incident_record)
-                if inspect.iscoroutinefunction(getattr(redis_client, "lpush", None)):
-                    await redis_client.lpush("list:incidents", rec_json)
-                    await redis_client.ltrim("list:incidents", 0, 999)
-                elif hasattr(redis_client, "lpush"):
-                    redis_client.lpush("list:incidents", rec_json)
-                    redis_client.ltrim("list:incidents", 0, 999)
-            except Exception as e:
-                logger.warning(f"Failed to store incident in Redis list:incidents: {e}")
+        # Save to Redis list:incidents and in-memory tracker
+        tracker_instance.add_incident(incident_record)
 
         # Add to ThreatTracker alert log
         tracker_instance.add_alert(

@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/threats", tags=["Threat Observability & Dashb
 
 
 class UnblockIPPayload(BaseModel):
-    ip: str = Field(..., example="192.168.1.100")
+    ip: str = Field(..., json_schema_extra={"example": "192.168.1.100"})
 
 
 @router.get("/feed")
@@ -30,42 +30,35 @@ async def get_threat_feed(request: Request):
     """
     redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
     events: List[Dict[str, Any]] = []
+    seen_ids = set()
 
-    # 1. Fetch from Redis list:incidents
-    if redis_client:
-        try:
-            if inspect.iscoroutinefunction(getattr(redis_client, "lrange", None)):
-                raw_incidents = await redis_client.lrange("list:incidents", 0, 49)
-            elif hasattr(redis_client, "lrange"):
-                raw_incidents = redis_client.lrange("list:incidents", 0, 49)
-            else:
-                raw_incidents = []
+    # 1. Fetch from ThreatTracker incident store (Redis / In-memory)
+    incidents = tracker_instance.get_incidents(limit=50)
+    for inc in incidents:
+        inc_id = inc.get("id", "")
+        if inc_id and inc_id not in seen_ids:
+            seen_ids.add(inc_id)
+            events.append(inc)
 
-            for raw_item in raw_incidents:
-                try:
-                    item = json.loads(raw_item)
-                    events.append(item)
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.debug(f"Redis error fetching list:incidents: {e}")
-
-    # 2. Fetch from ThreatTracker in-memory alerts
-    snapshot = tracker_instance.get_metrics_snapshot()
-    for alert in snapshot.get("recent_alerts", []):
-        events.append({
-            "id": alert.get("id", "alert_gen"),
-            "timestamp": alert.get("timestamp", datetime.now(timezone.utc).isoformat()),
-            "ip": "127.0.0.1",
-            "threat_type": "SECURITY_ALERT",
-            "severity": alert.get("severity", "HIGH"),
-            "score": 0.85,
-            "action": "BLOCKED" if alert.get("severity") in ["CRITICAL", "HIGH"] else "FLAGGED",
-            "message": alert.get("message", "")
-        })
+    # 2. Fetch from ThreatTracker recent alerts
+    alerts = tracker_instance.get_recent_alerts(limit=50)
+    for alert in alerts:
+        alert_id = alert.get("id", "")
+        if alert_id and alert_id not in seen_ids:
+            seen_ids.add(alert_id)
+            events.append({
+                "id": alert_id,
+                "timestamp": alert.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                "ip": "127.0.0.1",
+                "threat_type": "SECURITY_ALERT",
+                "severity": alert.get("severity", "HIGH"),
+                "score": 0.85,
+                "action": "BLOCKED" if alert.get("severity") in ["CRITICAL", "HIGH"] else "FLAGGED",
+                "message": alert.get("message", "")
+            })
 
     # Sort events by timestamp descending and take top 50
-    events.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    events.sort(key=lambda x: str(x.get("timestamp", "")), reverse=True)
     events = events[:50]
 
     # Mock fallback events if list is empty to prevent dashboard crashes

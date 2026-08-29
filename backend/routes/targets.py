@@ -21,18 +21,18 @@ router = APIRouter(prefix="/api/v1", tags=["Attacker Simulation Targets"])
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., example="admin")
-    password: str = Field(..., example="secret123")
+    username: str = Field(..., json_schema_extra={"example": "admin"})
+    password: str = Field(..., json_schema_extra={"example": "secret123"})
 
 
 class BulkItem(BaseModel):
-    id: str = Field(..., example="item_1")
-    value: str = Field(..., example="sample_data")
+    id: str = Field(..., json_schema_extra={"example": "item_1"})
+    value: str = Field(..., json_schema_extra={"example": "sample_data"})
 
 
 class BulkDataRequest(BaseModel):
-    batch_name: str = Field("default_batch", example="test_batch")
-    items: List[Dict[str, Any]] = Field([], example=[{"id": "1", "val": "abc"}])
+    batch_name: str = Field("default_batch", json_schema_extra={"example": "test_batch"})
+    items: List[Dict[str, Any]] = Field([], json_schema_extra={"example": [{"id": "1", "val": "abc"}]})
 
 
 SQLI_PATTERNS = [
@@ -115,7 +115,7 @@ async def login_target(request: Request, credentials: LoginRequest = Body(...)):
 
 
 @router.get("/search")
-async def search_target(request: Request, q: str = Query(..., example="laptop")):
+async def search_target(request: Request, q: str = Query(..., examples=["laptop"])):
     """
     Simulated search target endpoint vulnerable to SQL Injection & XSS probes.
     """

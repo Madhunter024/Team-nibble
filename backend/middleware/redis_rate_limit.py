@@ -15,16 +15,16 @@ logger = logging.getLogger("nibdefender.rate_limit")
 try:
     from ml_engine.inference import detect_anomaly
 except Exception:
-    def detect_anomaly(req_frequency: float, payload_size: float, header_entropy: float, error_rate: float) -> bool:
+    def detect_anomaly(payload: str, request_rate: int) -> bool:
         """Fallback ML anomaly detector mock."""
-        return False
+        return request_rate > 100 or len(payload) > 5000
 
 try:
     from ml_engine.ai_reporter import generate_threat_report
 except Exception:
-    def generate_threat_report(incident: dict) -> str:
+    def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
         """Fallback ML threat report generator mock."""
-        return "Mock report generated"
+        return f"[CISO Incident Summary] Anomaly flagged from {ip} with vector {attack_type}."
 
 
 class ThreatTracker:
@@ -53,6 +53,7 @@ class ThreatTracker:
 
         # In-memory storage fallback
         self.memory_store: Dict[str, List[float]] = {}
+        self.in_memory_incidents: List[Dict[str, Any]] = []
         self.in_memory_metrics = {
             "total_requests": 0,
             "blocked_ips": set(),
@@ -146,6 +147,29 @@ class ThreatTracker:
             except Exception as e:
                 logger.warning(f"Redis lrange error: {e}")
         return self.in_memory_metrics["alerts"][:limit]
+
+    def add_incident(self, incident: Dict[str, Any]) -> None:
+        """Add an evaluated incident record to Redis and in-memory storage."""
+        if self.redis:
+            try:
+                self.redis.lpush("list:incidents", json.dumps(incident))
+                self.redis.ltrim("list:incidents", 0, 99)
+            except Exception as e:
+                logger.warning(f"Redis lpush error for list:incidents: {e}")
+        
+        self.in_memory_incidents.insert(0, incident)
+        self.in_memory_incidents = self.in_memory_incidents[:100]
+
+    def get_incidents(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retrieve latest incidents from Redis or in-memory fallback."""
+        if self.redis:
+            try:
+                raw_list = self.redis.lrange("list:incidents", 0, limit - 1)
+                if raw_list:
+                    return [json.loads(item) for item in raw_list]
+            except Exception as e:
+                logger.warning(f"Redis lrange error for list:incidents: {e}")
+        return self.in_memory_incidents[:limit]
 
     def check_rate_limit(self, ip: str) -> Tuple[bool, int]:
         """

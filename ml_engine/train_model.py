@@ -34,13 +34,13 @@ def generate_synthetic_data(num_samples: int = 1500) -> pd.DataFrame:
     n_anomaly = num_samples - n_normal
 
     # Normal traffic
-    normal_lengths = np.random.normal(loc=120, scale=40, size=n_normal).clip(10, 500)
-    normal_rates = np.random.normal(loc=12, scale=5, size=n_normal).clip(1, 35)
+    normal_lengths = np.random.uniform(low=5, high=300, size=n_normal)
+    normal_rates = np.random.uniform(low=1, high=25, size=n_normal)
     normal_tokens = np.zeros(n_normal)
 
     # Anomalous traffic
-    anomaly_lengths = np.random.uniform(low=800, high=50000, size=n_anomaly)
-    anomaly_rates = np.random.uniform(low=80, high=1000, size=n_anomaly)
+    anomaly_lengths = np.random.uniform(low=600, high=50000, size=n_anomaly)
+    anomaly_rates = np.random.uniform(low=60, high=1000, size=n_anomaly)
     anomaly_tokens = np.random.randint(low=1, high=10, size=n_anomaly)
 
     df_normal = pd.DataFrame({
@@ -69,7 +69,7 @@ def train_and_save_model() -> str:
     X = df[feature_cols]
 
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    X_scaled = scaler.fit_transform(X.values)
 
     print("🌲 Training IsolationForest Anomaly Detection Model...")
     model = IsolationForest(

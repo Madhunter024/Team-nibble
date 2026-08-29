@@ -51,10 +51,10 @@ logger = logging.getLogger("nibdefender.main")
 
 
 class TokenRequestPayload(BaseModel):
-    user_id: str = Field("user_123", example="user_123")
-    role: str = Field("admin", example="admin")
-    scopes: list[str] = Field(["read", "write"], example=["read", "write"])
-    expires_minutes: int = Field(15, example=15)
+    user_id: str = Field("user_123", json_schema_extra={"example": "user_123"})
+    role: str = Field("admin", json_schema_extra={"example": "admin"})
+    scopes: list[str] = Field(["read", "write"], json_schema_extra={"example": ["read", "write"]})
+    expires_minutes: int = Field(15, json_schema_extra={"example": 15})
 
 
 @asynccontextmanager
@@ -74,10 +74,11 @@ async def lifespan(app: FastAPI):
     app.state.redis = redis_client
 
     try:
-        await redis_client.ping()
+        await asyncio.wait_for(redis_client.ping(), timeout=0.5)
         logger.info("Successfully connected to Redis instance.")
     except Exception as e:
-        logger.warning(f"Redis unreachable during startup ({e}). Running in resilient mode.")
+        logger.warning(f"Redis unreachable during startup ({e}). Running in resilient in-memory mode.")
+        app.state.redis = None
 
     yield
 
@@ -170,11 +171,10 @@ async def health_check(request: Request):
 
     if redis_client:
         try:
-            is_alive = await redis_client.ping()
+            is_alive = await asyncio.wait_for(redis_client.ping(), timeout=0.3)
             if is_alive:
                 redis_status = "connected"
-        except Exception as e:
-            logger.warning(f"Redis ping failed during health check: {e}")
+        except Exception:
             redis_status = "disconnected"
 
     return {

@@ -11,16 +11,18 @@ def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
     """
     api_key = os.getenv("GOOGLE_API_KEY")
 
-    if api_key and api_key != "your_google_api_key_here":
+    # Check for valid non-placeholder API key
+    if api_key and api_key.strip() not in ["", "your_google_api_key_here", "None"] and len(api_key.strip()) > 10:
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             from langchain_core.prompts import PromptTemplate
-            from langchain_core.output_parsers import StrOutputParser # <-- NEW IMPORT
+            from langchain_core.output_parsers import StrOutputParser
 
             llm = ChatGoogleGenerativeAI(
-                model="gemini-3.5-flash",
-                google_api_key=api_key,
-                temperature=0.2
+                model="gemini-1.5-flash",
+                google_api_key=api_key.strip(),
+                temperature=0.2,
+                timeout=5
             )
             prompt = PromptTemplate(
                 input_variables=["ip", "attack_type", "raw_payload"],
@@ -35,10 +37,8 @@ def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
                 """
             )
             
-            # Add StrOutputParser to the end of the chain
             chain = prompt | llm | StrOutputParser() 
             
-            # The result is now guaranteed to be a clean string
             report_text = chain.invoke({
                 "ip": ip,
                 "attack_type": attack_type,
@@ -48,7 +48,7 @@ def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
             if report_text:
                 return report_text
         except Exception as e:
-            print(f"⚠️ Google Gemini / LangChain execution error ({e}). Using local fallback mock.")
+            print(f"⚠️ Google Gemini / LangChain execution error ({e}). Using local fallback summary.")
 
     # Local fallback mocking if GOOGLE_API_KEY is missing or fails
     payload_preview = raw_payload[:40] + "..." if len(raw_payload) > 40 else raw_payload

@@ -93,17 +93,22 @@ def simulate_sqli_attack():
     """
     print(f"\n{BLUE}🗡️ [SQL Injection Attack Simulation] Testing WAF detection...{RESET}")
     for payload in SQLI_PAYLOADS:
+        random_ip = f"185.220.{random.randint(10, 240)}.{random.randint(1, 250)}"
+        headers = {
+            "User-Agent": random.choice(USER_AGENTS),
+            "X-Forwarded-For": random_ip
+        }
         # Search target
         try:
-            res = requests.get(f"{TARGET_BASE_URL}/api/v1/search", params={"q": payload}, timeout=2)
-            print_status("GET", f"/api/v1/search?q={payload[:20]}...", res.status_code, res.text[:60])
+            res = requests.get(f"{TARGET_BASE_URL}/api/v1/search", params={"q": payload}, headers=headers, timeout=2)
+            print_status("GET", f"/api/v1/search?q={payload[:20]}...", res.status_code, f"IP: {random_ip} -> {res.text[:50]}")
         except Exception as e:
             print(f"{RED}[Error] {e}{RESET}")
 
         # Login target
         try:
-            res = requests.post(f"{TARGET_BASE_URL}/api/v1/auth/login", json={"username": payload, "password": "123"}, timeout=2)
-            print_status("POST", "/api/v1/auth/login", res.status_code, res.text[:60])
+            res = requests.post(f"{TARGET_BASE_URL}/api/v1/auth/login", json={"username": payload, "password": "123"}, headers=headers, timeout=2)
+            print_status("POST", "/api/v1/auth/login", res.status_code, f"IP: {random_ip} -> {res.text[:50]}")
         except Exception as e:
             print(f"{RED}[Error] {e}{RESET}")
 
@@ -112,12 +117,18 @@ def simulate_brute_force():
     """
     Simulates rapid credential stuffing / brute-force dictionary attack on login endpoint.
     """
-    print(f"\n{YELLOW}🔑 [Brute-Force Attack Simulation] Attempting dictionary attack...{RESET}")
+    random_ip = f"45.154.{random.randint(10, 240)}.{random.randint(1, 250)}"
+    headers = {
+        "User-Agent": random.choice(USER_AGENTS),
+        "X-Forwarded-For": random_ip
+    }
+    print(f"\n{YELLOW}🔑 [Brute-Force Attack Simulation] Attempting dictionary attack from {random_ip}...{RESET}")
     for pwd in BRUTE_FORCE_PASSWORDS:
         try:
             res = requests.post(
                 f"{TARGET_BASE_URL}/api/v1/auth/login",
                 json={"username": "admin", "password": pwd},
+                headers=headers,
                 timeout=2
             )
             print_status("POST", "/api/v1/auth/login", res.status_code, f"user=admin pwd={pwd}")
@@ -130,10 +141,15 @@ def simulate_honeypot_hit():
     """
     Probes honeypot endpoints to verify immediate 24-hour IP banning.
     """
-    print(f"\n{RED}🍯 [Honeypot Trap Probe Simulation] Hitting sensitive trap endpoints...{RESET}")
+    random_ip = f"91.240.{random.randint(10, 240)}.{random.randint(1, 250)}"
+    headers = {
+        "User-Agent": random.choice(USER_AGENTS),
+        "X-Forwarded-For": random_ip
+    }
+    print(f"\n{RED}🍯 [Honeypot Trap Probe Simulation] Hitting sensitive trap endpoints from {random_ip}...{RESET}")
     path = random.choice(HONEYPOT_PATHS)
     try:
-        res = requests.get(f"{TARGET_BASE_URL}{path}", timeout=2)
+        res = requests.get(f"{TARGET_BASE_URL}{path}", headers=headers, timeout=2)
         print_status("GET", path, res.status_code, res.text[:80])
     except Exception as e:
         print(f"{RED}[Error] {e}{RESET}")
