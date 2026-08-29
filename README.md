@@ -1,7 +1,6 @@
 # 🛡️ Nibdefender
 
-**Nibdefender** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. Nibdefender combines FastAPI backend security middleware, Redis sliding-window rate limiting, Scikit-learn anomaly detection, LangChain automated incident reporting, and a Tremor dashboard for real-time observability.
-
+**Nibdefender** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. Nibdefender combines FastAPI backend security middleware, Redis sliding-window rate limiting, a local dual-engine ML threat detector (**Hugging Face MobileBERT + Scikit-Learn IsolationForest**), and a Next.js command dashboard for real-time security operations.
 
 ---
 
@@ -15,29 +14,41 @@ Nibdefender/
 │   ├── middleware/        # Redis rate-limiting, IP blacklisting, PyJWT & Telemetry
 │   │   ├── __init__.py
 │   │   ├── rate_limiter.py # Sliding-window rate limiter & dynamic IP blocker
-│   │   ├── redis_rate_limit.py # ThreatTracker singleton & sampling state
+│   │   ├── redis_rate_limit.py # ThreatTracker singleton & telemetry metrics
 │   │   ├── telemetry.py    # Live request streaming & dynamic sampling dispatcher
 │   │   └── auth.py        # PyJWT verification & access tokens
 │   ├── routes/            # Target API endpoints, honeypot & simulation routes
 │   └── requirements.txt   # Backend Python dependencies
-├── frontend/              # Next.js & Tremor Security Operations Dashboard
+├── frontend/              # Next.js & Tailwind Security Operations Dashboard
 │   ├── app/               # Next.js App Router (page.tsx, layout.tsx)
-│   ├── components/        # Dashboard shell, TrafficChart, ThreatFeed & Sampling Controls
-│   ├── lib/               # API fetching & mock simulation utilities
+│   ├── components/        # Dashboard shell, TrafficChart, ThreatFeed, BlockedIPsTable & AttackerConsole
+│   ├── lib/               # API fetching & telemetry interface types
 │   └── package.json
-├── ml_engine/             # 100% Local Scikit-learn Threat Detection Engine
-│   ├── train_model.py     # Dual-model offline pipeline trainer (SQLi + IsolationForest)
-│   ├── inference.py       # Sub-15ms offline local inference pipeline
+├── ml_engine/             # 100% Local Dual ML Threat Detection Engine
+│   ├── train_model.py     # IsolationForest baseline anomaly detector trainer
+│   ├── inference.py       # MobileBERT + IsolationForest thread-safe local inference
 │   ├── ai_reporter.py     # CISO Security Incident Report Generator
-│   ├── sqli_detector.joblib # Serialized TF-IDF + SGD Classifier pipeline
-│   ├── iso_forest.joblib    # Serialized IsolationForest anomaly detector
-│   └── requirements.txt   # ML dependencies (scikit-learn, numpy, joblib, pydantic)
+│   ├── iso_forest.joblib  # Serialized IsolationForest anomaly detector
+│   └── requirements.txt   # ML dependencies (torch, transformers, scikit-learn, numpy, joblib, pydantic)
 ├── scripts/               # Attacker Simulation Suite
 │   └── attacker.py        # Automated attack script (DDoS, SQLi, Auth Brute-force)
 ├── .env.example           # Shared environment variables
 ├── .gitignore
 └── README.md
 ```
+
+---
+
+## 🧠 Dual-Engine ML Architecture
+
+Nibdefender utilizes a **100% local, sub-15ms dual-model threat detection pipeline** that runs completely offline on CPU without external API dependencies:
+
+1. **Hugging Face MobileBERT (`cssupport/mobilebert-sql-injection-detect`)**:
+   - Pre-trained transformer sequence classification model fine-tuned for deep SQL Injection vector and syntax analysis.
+   - Evaluates incoming request parameters and body payloads with PyTorch evaluation mode (`torch.no_grad()`).
+2. **Scikit-Learn IsolationForest (`iso_forest.joblib`)**:
+   - Unsupervised anomaly detector trained on baseline request vectors `[request_velocity, payload_size, header_entropy]`.
+   - Identifies high-rate DDoS floods, abnormal payload spikes, and header manipulation.
 
 ---
 
@@ -50,12 +61,12 @@ The Nibdefender backend gateway relies on the following core Python libraries:
 | **`fastapi`** | `0.110.0` | High-performance ASGI web framework |
 | **`uvicorn[standard]`** | `0.28.0` | Production ASGI web server with `httptools` & `uvloop` |
 | **`redis`** | `5.0.0` | Async Redis client (`redis.asyncio`) for ZSET sliding-window rate limiting & IP blacklisting |
+| **`torch`** | `2.0+` | PyTorch CPU runtime for MobileBERT local inference |
+| **`transformers`** | `4.38+` | Hugging Face Transformers library for `mobilebert-sql-injection-detect` |
+| **`scikit-learn`** | `1.4.0` | Anomaly detection model (`IsolationForest`) |
 | **`pydantic`** | `2.6.0` | Strict data validation & type enforcement |
 | **`pydantic-settings`** | `2.2.0` | Environment settings management parsing `.env` file |
 | **`pyjwt`** | `2.8.0` | JSON Web Token encoding and verification |
-| **`python-dotenv`** | `1.0.0` | Loading environment variables from `.env` |
-| **`httpx`** | `0.27.0` | Async HTTP client for endpoint testing and health verification |
-| **`requests`** | `2.31.0` | Synchronous HTTP request utility |
 
 ---
 
@@ -74,9 +85,10 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-#### **Step 3: Install all backend dependencies**
+#### **Step 3: Install backend & ML dependencies**
 ```bash
 pip install -r requirements.txt
+pip install -r ../ml_engine/requirements.txt
 ```
 
 #### **Step 4: Configure environment variables (optional)**
@@ -92,24 +104,21 @@ uvicorn main:app --reload --port 8000
 
 ---
 
-### 2. Frontend Setup (Next.js & Tremor)
+### 2. Frontend Setup (Next.js & Tailwind Dashboard)
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
-### 3. ML Engine Setup (100% Local Scikit-learn & Joblib)
+### 3. ML Engine Setup (MobileBERT + IsolationForest)
 ```bash
 cd ml_engine
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python train_model.py  # Train dual models (sqli_detector.joblib & iso_forest.joblib)
-python inference.py    # Verify sub-15ms offline local inference pipeline
+python train_model.py  # Trains IsolationForest baseline detector (iso_forest.joblib)
+python inference.py    # Downloads/loads MobileBERT and verifies sub-15ms inference pipeline
 ```
 
-### 4. Run Attacker Simulation
+### 4. Run Attacker Simulation Suite
 ```bash
 cd scripts
 python attacker.py
@@ -117,117 +126,13 @@ python attacker.py
 
 ---
 
-## 🛠️ Prerequisites & System Dependencies Installation
-
-Before running Nibdefender, ensure you have **Python (3.9+)**, **Node.js (18+)**, **npm**, and **Redis Server** installed on your system.
-
-### Required Software & Tools
-| Dependency | Recommended Version | Purpose |
-| :--- | :--- | :--- |
-| **Python** | 3.9+ | Backend (FastAPI), ML Engine, Attacker Simulation |
-| **Node.js & npm** | Node v18+ / npm v9+ | Frontend Dashboard (Next.js & Tremor) |
-| **Redis Server** | 6.x / 7.x | IP Rate Limiting & High-Speed Blocking Storage |
-| **Git** | Latest | Version control |
-
----
-
-### 💻 OS-Specific System Installation Commands
-
-#### 🍎 macOS (via Homebrew)
-```bash
-# 1. Install Homebrew (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# 2. Install Python, Node.js, and Redis
-brew install python node redis git
-
-# 3. Start Redis Server service
-brew services start redis
-```
-
-#### 🐧 Linux (Ubuntu / Debian)
-```bash
-# 1. Update package lists
-sudo apt update && sudo apt upgrade -y
-
-# 2. Install Python, venv, Node.js, npm, Redis, and Git
-sudo apt install -y python3 python3-pip python3-venv nodejs npm redis-server git
-
-# 3. Start and enable Redis service
-sudo systemctl enable --now redis-server
-```
-
-#### 🐧 Linux (Fedora / RHEL)
-```bash
-sudo dnf install -y python3 python3-pip nodejs redis git
-sudo systemctl enable --now redis
-```
-
-#### 🐧 Linux (Arch Linux)
-```bash
-sudo pacman -S python python-pip nodejs npm redis git
-sudo systemctl enable --now redis
-```
-
-#### 🪟 Windows
-
-**Option A: Using Windows Package Manager (`winget` in PowerShell)**
-```powershell
-# 1. Install Python, Node.js, and Git
-winget install Python.Python.3.11
-winget install OpenJS.NodeJS.LTS
-winget install Git.Git
-
-# 2. Install Redis for Windows (or via Memurai / WSL2)
-winget install Redis.Redis
-```
-
-**Option B: Using WSL2 (Windows Subsystem for Linux - Recommended for Redis)**
-```bash
-# Inside WSL Ubuntu Terminal:
-sudo apt update
-sudo apt install -y python3 python3-venv nodejs npm redis-server
-sudo service redis-server start
-```
-
----
-
-## 📡 Backend API Contract & Health Check
-
-### Health Verification Endpoint (`GET /health`)
-Verifies application operational state and async Redis ping status:
-```json
-{
-  "status": "healthy",
-  "redis": "connected"
-}
-```
-
-### Threat Metrics Endpoint (`GET /api/threat-metrics`)
-Returns operational security metrics, Redis-blocked IP sets, and security alerts for the dashboard:
-```json
-{
-  "total_requests": 150,
-  "blocked_ips_count": 2,
-  "blocked_ips_list": ["192.168.1.105", "10.0.0.5"],
-  "recent_alerts": [
-    {
-      "id": "alert_c91f42a0",
-      "timestamp": "2026-08-28T21:10:00Z",
-      "severity": "CRITICAL",
-      "message": "IP 192.168.1.105 automatically blacklisted for 1hr after 3 consecutive rate limit breaches."
-    }
-  ]
-}
-```
-
----
-
 ## 🔒 Key Features
-- **100% Local Machine Learning Engine:** Dual-model offline pipeline (`TfidfVectorizer` + `SGDClassifier` and `IsolationForest`) executing sub-15ms inference without external API dependencies.
-- **Redis IP Rate Limiting & Autonomous Blocking:** Dynamic IP throttling via ZSET sliding window and automatic 24-hour blacklisting after high-confidence threat detection or repeated rate breaches.
-- **Dynamic API Traffic Sampling:** Adjustable ML sampling rates (25%, 50%, 75%, 100%) with Redis state synchronization to balance inspection depth against CPU compute overhead.
-- **Pydantic Settings & Safety Guards:** Centralized environment parsing with loopback protection (`127.0.0.1`, `localhost`) to prevent self-blocking during red-team simulations.
-- **JWT Security Guard:** Token validation and RBAC claims verification middleware.
-- **CISO Security Incident Reports:** Automated local incident report generation providing actionable executive summaries for flagged attacks.
-- **Split-Screen War Room Dashboard:** Live Next.js & Tremor command center with real-time traffic charts, interactive attacker console, and active sampling controls.
+
+- **MobileBERT Transformer SQLi Inspection:** Local Hugging Face `cssupport/mobilebert-sql-injection-detect` transformer model for deep SQL Injection vector detection.
+- **IsolationForest Anomaly Detection:** Unsupervised behavioral anomaly detector trained on request velocity, payload size, and header entropy.
+- **Redis IP Rate Limiting & Autonomous Blocking:** Dynamic IP throttling via ZSET sliding window and automatic 24-hour blacklisting upon high anomaly scores.
+- **Dynamic API Traffic Sampling:** Adjustable ML sampling rates (25%, 50%, 75%, 100%) to balance inspection depth against CPU compute overhead.
+- **Real-Time Block Velocity Observability:** High-precision graph velocity synchronization reflecting exact 403/429 blocked request bursts in real time.
+- **Live Blocked Sources Table:** Real-time table displaying quarantined IP addresses with dynamic relative timestamps (`Just now`, `5s ago`) and threat vector classifications.
+- **Custom Attack Payload Lab:** Red-Team simulation bench for testing SQLi, XSS, and custom payloads against target gateway endpoints.
+- **Split-Screen War Room Dashboard:** Next.js operator control panel featuring live ML Latency indicator (~9.3ms), ML Anomaly Index Gauge, and Enterprise Defense Ticker.
