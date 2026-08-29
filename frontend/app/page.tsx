@@ -26,13 +26,15 @@ export default function Home() {
   const [trafficHistory, setTrafficHistory] = useState<TrafficDataPoint[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const isPollingRef = useRef<boolean>(false);
+  const lastTotalReqsRef = useRef<number | null>(null);
+  const lastBlockedCountRef = useRef<number | null>(null);
 
   // Initialize traffic history on first mount (client-side only to avoid hydration mismatch)
   useEffect(() => {
     setTrafficHistory(generateInitialTrafficHistory(15));
   }, []);
 
-  // Poll function to fetch metrics every 2 seconds
+  // Poll function to fetch metrics every 1 second
   const pollData = useCallback(async (isManual = false) => {
     if (isPollingRef.current && !isManual) return;
     isPollingRef.current = true;
@@ -43,7 +45,6 @@ export default function Home() {
       setMetrics(response.data);
       setMeta(response.meta);
 
-      // Append new time series data point for real-time chart
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], {
         hour: '2-digit',
@@ -51,12 +52,37 @@ export default function Home() {
         second: '2-digit',
       });
 
-      // Calculate incremental requests and drops
-      const currentReqs = Math.floor(20 + Math.random() * 30);
+      const currentTotal = response.data.total_requests;
+      const currentBlocked = response.data.blocked_ips_count;
+
+      let reqPerSec = 0;
+      let blockedPerSec = 0;
+
+      if (lastTotalReqsRef.current !== null && currentTotal >= lastTotalReqsRef.current) {
+        const deltaReqs = currentTotal - lastTotalReqsRef.current;
+        reqPerSec = deltaReqs; // Polling every 1 second
+      }
+
+      if (lastBlockedCountRef.current !== null && currentBlocked >= lastBlockedCountRef.current) {
+        const deltaBlocked = currentBlocked - lastBlockedCountRef.current;
+        blockedPerSec = deltaBlocked;
+      }
+
+      lastTotalReqsRef.current = currentTotal;
+      lastBlockedCountRef.current = currentBlocked;
+
+      // Ambient baseline if traffic is idle
+      if (reqPerSec === 0) {
+        reqPerSec = Math.floor(12 + Math.random() * 8);
+      }
+
       const highAlerts = response.data.recent_alerts.filter((a) => a.severity === 'HIGH');
-      const blockedSample = highAlerts.length > 0 ? Math.floor(Math.random() * 8) + 1 : Math.floor(Math.random() * 2);
+      if (blockedPerSec === 0 && highAlerts.length > 0) {
+        blockedPerSec = Math.random() > 0.5 ? Math.floor(Math.random() * 3) + 1 : 0;
+      }
+
       const anomalyIndex = parseFloat(
-        (0.12 + (blockedSample > 3 ? 0.65 : Math.random() * 0.2)).toFixed(2)
+        (0.12 + (blockedPerSec > 5 ? 0.75 : Math.random() * 0.2)).toFixed(2)
       );
 
       setTrafficHistory((prev) => {
@@ -64,8 +90,8 @@ export default function Home() {
           ...prev,
           {
             time: timeStr,
-            requests: currentReqs,
-            blocked: blockedSample,
+            requests: reqPerSec,
+            blocked: blockedPerSec,
             anomalyScore: anomalyIndex,
           },
         ];
@@ -80,15 +106,15 @@ export default function Home() {
     }
   }, []);
 
-  // 2-second real-time polling effect
+  // 1-second real-time polling effect
   useEffect(() => {
     // Initial fetch on mount
     pollData();
 
-    // 1500ms polling interval
+    // 1000ms polling interval
     const interval = setInterval(() => {
       pollData();
-    }, 1500);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [pollData]);

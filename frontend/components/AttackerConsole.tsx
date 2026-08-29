@@ -110,6 +110,32 @@ export const AttackerConsole: React.FC = () => {
     setTimeout(() => setIsAttacking(false), 120 * 20 + 500);
   };
 
+  const [customPayload, setCustomPayload] = useState("SELECT * FROM users WHERE '1'='1' --");
+  const [customEndpoint, setCustomEndpoint] = useState("/api/v1/auth/login");
+
+  const handleCustomAttack = async () => {
+    try {
+      const res = await fetch(`${API_URL}${customEndpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': generateRandomIp()
+        },
+        body: JSON.stringify({ payload: customPayload, input: customPayload }),
+      });
+      const data = await res.json().catch(() => ({}));
+      addLog({
+        method: 'POST',
+        endpoint: customEndpoint,
+        status: res.status,
+        response: res.status === 403 ? 'Forbidden - Local ML Quarantined' : (res.status === 429 ? 'Too Many Requests - Rate Limited' : JSON.stringify(data).substring(0, 45)),
+        type: 'attack'
+      });
+    } catch (err: any) {
+      addLog({ method: customEndpoint, endpoint: customEndpoint, status: 'ERR', response: err.message, type: 'attack' });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-zinc-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
       {/* Header */}
@@ -147,6 +173,33 @@ export const AttackerConsole: React.FC = () => {
           <Zap className="w-4 h-4" />
           {isAttacking ? 'Firing...' : 'Launch DDoS Spike'}
         </button>
+
+        {/* Custom Attack Payload Lab */}
+        <div className="mt-2 pt-3 border-t border-slate-800 flex flex-col gap-2">
+          <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+            Custom Attack Payload Lab:
+          </div>
+          <input
+            type="text"
+            value={customEndpoint}
+            onChange={(e) => setCustomEndpoint(e.target.value)}
+            placeholder="Target Endpoint e.g. /api/v1/auth/login"
+            className="w-full px-3 py-1.5 bg-black border border-slate-800 rounded text-xs font-mono text-slate-300 focus:outline-none focus:border-red-900"
+          />
+          <input
+            type="text"
+            value={customPayload}
+            onChange={(e) => setCustomPayload(e.target.value)}
+            placeholder="Custom Payload e.g. <script>alert(1)</script>"
+            className="w-full px-3 py-1.5 bg-black border border-slate-800 rounded text-xs font-mono text-amber-400 focus:outline-none focus:border-amber-900"
+          />
+          <button
+            onClick={handleCustomAttack}
+            className="w-full py-1.5 px-3 bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 text-xs font-mono font-medium rounded border border-purple-800/40 transition-colors"
+          >
+            ⚡ Fire Custom Payload
+          </button>
+        </div>
       </div>
 
       {/* Terminal Output */}
