@@ -382,6 +382,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           {/* Blocked Sources Table */}
           <BlockedIPsTable
             blockedIps={metrics.blocked_ips_list}
+            alerts={metrics.recent_alerts}
             onUnblock={onUnblockIp}
           />
         </section>
