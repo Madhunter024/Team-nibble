@@ -9,7 +9,7 @@ from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
 
-logger = logging.getLogger("strata.rate_limit")
+logger = logging.getLogger("nibdefender.rate_limit")
 
 # --- ML Interface Contract Import Wrapper ---
 try:
@@ -38,12 +38,13 @@ class ThreatTracker:
         self.window_seconds = window_seconds
 
         # Redis client setup (optional)
-        self.redis = None
-        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_host = os.getenv("REDIS_HOST", "127.0.0.1")
+        if redis_host == "localhost":
+            redis_host = "127.0.0.1"
         redis_port = int(os.getenv("REDIS_PORT", 6379))
         try:
             import redis
-            client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True, socket_connect_timeout=1, protocol=2)
+            client = redis.Redis(host=redis_host, port=redis_port, db=0, decode_responses=True, socket_connect_timeout=0.3, socket_timeout=0.3, protocol=2)
             client.ping()
             self.redis = client
             logger.info("Connected to Redis successfully for ThreatTracker.")
@@ -65,7 +66,7 @@ class ThreatTracker:
                     "id": "alert_init_1",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "severity": "LOW",
-                    "message": "Strata Threat Defense Gateway started successfully."
+                    "message": "Nibdefender Threat Defense Gateway started successfully."
                 }
             ]
         }

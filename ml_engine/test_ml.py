@@ -22,6 +22,14 @@ def run_tests():
     normal_result = detect_anomaly(normal_payload, normal_rate)
     print(f"Normal Request Output: {normal_result} (Type: {type(normal_result).__name__})")
     assert isinstance(normal_result, bool), "detect_anomaly must return a boolean!"
+    assert normal_result is False, "Normal payload must return False!"
+
+    # Test Clean Login Case
+    clean_login = "username=admin&password=secret123"
+    clean_result = detect_anomaly(clean_login, 5)
+    print(f"Clean Login Request Output: {clean_result} (Type: {type(clean_result).__name__})")
+    assert clean_result is False, "Clean login payload must return False!"
+
 
     # Test SQLi Case
     sqli_payload = "username=' OR '1'='1'-- &password=admin"

@@ -26,7 +26,7 @@ except ImportError:
     except ImportError:
         evaluate_request_anomaly = None
 
-logger = logging.getLogger("strata.telemetry")
+logger = logging.getLogger("nibdefender.telemetry")
 
 
 def calculate_shannon_entropy(text: str) -> float:
@@ -90,6 +90,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
                 logger.debug(f"Error reading velocity from Redis: {e}")
 
         query_str = str(request.url.query) if request.url.query else ""
+        from ml_engine.inference import has_sqli_syntax
         telemetry_data = {
             "client_ip": client_ip,
             "endpoint": endpoint,
@@ -99,7 +100,7 @@ class TelemetryMiddleware(BaseHTTPMiddleware):
             "header_entropy": header_entropy,
             "request_velocity": request_velocity,
             "raw_payload": f"{endpoint}?{query_str}" if query_str else endpoint,
-            "is_potential_sqli": any(p in query_str.upper() for p in ["' OR '1'='1", "UNION SELECT", "DROP TABLE", "--", "';"]),
+            "is_potential_sqli": has_sqli_syntax(query_str),
             "is_potential_xss": any(p in query_str.lower() for p in ["<script>", "</script>", "javascript:", "onerror="])
         }
 

@@ -13,8 +13,11 @@ def train_iso_forest(output_path: str):
     joblib.dump(iso_forest, output_path)
     print(f"✅ IsolationForest Anomaly Detector successfully trained and saved to: {output_path}")
 
+train_and_save_model = train_iso_forest
+
 if __name__ == "__main__":
     base_dir = os.path.dirname(os.path.abspath(__file__))
     iso_path = os.path.join(base_dir, "iso_forest.joblib")
     print("🚀 Initializing IsolationForest offline training pipeline...")
     train_iso_forest(iso_path)
+

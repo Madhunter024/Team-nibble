@@ -16,11 +16,11 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    SECRET_KEY: str = "strata_super_secret_jwt_key_2026_production"
-    JWT_SECRET_KEY: str = "strata_super_secret_jwt_key_2026_production"
+    SECRET_KEY: str = "nibdefender_super_secret_jwt_key_2026_production"
+    JWT_SECRET_KEY: str = "nibdefender_super_secret_jwt_key_2026_production"
     JWT_ALGORITHM: str = "HS256"
     ALGORITHM: str = "HS256"
-    RATE_LIMIT_REQUESTS: int = 25
+    RATE_LIMIT_REQUESTS: int = 10
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
@@ -32,6 +32,6 @@ class Settings(BaseSettings):
 
 settings = Settings()
 # Sync SECRET_KEY and JWT_SECRET_KEY
-if settings.SECRET_KEY != "strata_super_secret_jwt_key_2026_production" and settings.JWT_SECRET_KEY == "strata_super_secret_jwt_key_2026_production":
+if settings.SECRET_KEY != "nibdefender_super_secret_jwt_key_2026_production" and settings.JWT_SECRET_KEY == "nibdefender_super_secret_jwt_key_2026_production":
     settings.JWT_SECRET_KEY = settings.SECRET_KEY
 

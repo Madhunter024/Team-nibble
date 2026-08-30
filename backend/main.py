@@ -48,7 +48,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("strata.main")
+logger = logging.getLogger("nibdefender.main")
 
 
 class TokenRequestPayload(BaseModel):
@@ -65,18 +65,20 @@ async def lifespan(app: FastAPI):
     the Redis connection pool on startup and shutdown.
     """
     logger.info("Initializing Redis async connection pool...")
+    host = "127.0.0.1" if settings.REDIS_HOST == "localhost" else settings.REDIS_HOST
     redis_client = aioredis.Redis(
-        host=settings.REDIS_HOST,
+        host=host,
         port=settings.REDIS_PORT,
         db=settings.REDIS_DB,
         decode_responses=True,
-        socket_connect_timeout=2,
+        socket_connect_timeout=0.3,
+        socket_timeout=0.3,
         protocol=2
     )
     app.state.redis = redis_client
 
     try:
-        await asyncio.wait_for(redis_client.ping(), timeout=0.5)
+        await asyncio.wait_for(redis_client.ping(), timeout=0.3)
         logger.info("Successfully connected to Redis instance.")
     except Exception as e:
         logger.warning(f"Redis unreachable during startup ({e}). Running in resilient in-memory mode.")
@@ -93,7 +95,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Strata API Gateway",
+    title="Nibdefender API Gateway",
     description="Real-time FastAPI & Redis threat detection and rate limiting engine.",
     version="1.0.0",
     lifespan=lifespan
@@ -231,7 +233,7 @@ async def manual_unblock_ip(request: Request, payload: ManualUnblockPayload = Bo
 @app.get("/")
 async def root():
     return {
-        "system": "Strata API Gateway",
+        "system": "Nibdefender API Gateway",
         "status": "active",
         "docs": "/docs"
     }

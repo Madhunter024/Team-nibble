@@ -57,6 +57,35 @@ def _load_mobilebert():
                     _hf_load_failed = True
 
 
+import re
+import urllib.parse
+
+SQLI_REGEXES = [
+    r"('|\"|`)\s*(or|and)\s*(\d+|\w+|'|\")\s*(=|<|>|!=|like)\s*(\d+|\w+|'|\")",
+    r"\b(or|and)\s+\d+\s*=\s*\d+",
+    r"('|\"|`)\s*--",
+    r"--\s*$",
+    r"/\*.*?\*/",
+    r"\bunion\s+(all\s+)?select\b",
+    r"\b(drop|truncate|alter)\s+table\b",
+    r"\b(insert\s+into|delete\s+from|update\s+\w+\s+set)\b",
+    r"\b(exec|execute)\s*\(",
+    r"\b(sleep|benchmark|waitfor\s+delay|pg_sleep)\s*\(",
+    r"('|\"|`)\s*;\s*(drop|select|insert|delete|update|exec)",
+    r"'\s*or\s*'1'='1",
+    r"'\s*or\s*1=1",
+    r"admin'\s*--",
+]
+
+def has_sqli_syntax(payload: str) -> bool:
+    """Checks whether a given payload contains verifiable SQL injection syntax/patterns."""
+    if not payload:
+        return False
+    unq = urllib.parse.unquote_plus(str(payload))
+    lower = unq.lower()
+    return any(re.search(pattern, lower, re.IGNORECASE) for pattern in SQLI_REGEXES)
+
+
 def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     """
     Perform 100% local, self-contained ML threat detection inference using
@@ -81,40 +110,31 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     sqli_detected = False
     confidence = 0.0
 
-    # 1. MobileBERT SQL Injection Inference
-    if raw_payload and not _hf_load_failed:
-        _load_mobilebert()
-        if _hf_model is not None and _tokenizer is not None:
-            try:
-                import torch
-                inputs = _tokenizer(raw_payload, return_tensors="pt", truncation=True, max_length=128)
-                with torch.no_grad():
-                    outputs = _hf_model(**inputs)
-                    logits = outputs.logits
-                    probs = torch.softmax(logits, dim=-1)[0]
-                    
-                    pred_class = int(torch.argmax(probs).item())
-                    if len(probs) > 1:
-                        # Class 1 is SQLi in cssupport/mobilebert-sql-injection-detect
-                        sqli_prob = float(probs[1].item())
-                        sqli_detected = bool(sqli_prob > 0.5 or pred_class == 1)
-                        confidence = sqli_prob if sqli_detected else float(probs[0].item())
-                    else:
-                        sqli_prob = float(probs[0].item())
-                        sqli_detected = bool(sqli_prob > 0.5)
-                        confidence = sqli_prob
-            except Exception as e:
-                logger.debug(f"MobileBERT inference exception: {e}")
+    # 1. SQL Injection Inspection (MobileBERT + Syntax verification)
+    has_syntax = has_sqli_syntax(raw_payload)
 
-    # Fallback heuristic inspection if transformer unavailable or cold-start fallback
-    lower_payload = raw_payload.lower()
-    known_sqli_patterns = [
-        "' or '1'='1", "union select", "drop table", "or 1=1", "admin' --",
-        "select * from", "<script>", "javascript:", "'; exec", "sleep("
-    ]
-    if any(pattern in lower_payload for pattern in known_sqli_patterns):
+    if has_syntax:
         sqli_detected = True
-        confidence = max(confidence, 0.98)
+        confidence = 0.98
+
+        # Run MobileBERT to obtain model confidence on suspicious payload
+        if not _hf_load_failed:
+            _load_mobilebert()
+            if _hf_model is not None and _tokenizer is not None:
+                try:
+                    import torch
+                    inputs = _tokenizer(raw_payload, return_tensors="pt", truncation=True, max_length=128)
+                    with torch.no_grad():
+                        outputs = _hf_model(**inputs)
+                        probs = torch.softmax(outputs.logits, dim=-1)[0]
+                        if len(probs) > 1:
+                            sqli_prob = float(probs[1].item())
+                            confidence = max(confidence, sqli_prob)
+                except Exception as e:
+                    logger.debug(f"MobileBERT inference exception: {e}")
+    else:
+        sqli_detected = False
+        confidence = 0.01
 
     # 2. IsolationForest Anomaly Prediction on [request_velocity, payload_size, header_entropy]
     velocity = float(telemetry.get("request_velocity", 1))
@@ -124,7 +144,8 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     iso_pred = 1
     decision_score = 0.0
 
-    if _iso_forest is not None and (payload_size > 50 or velocity > 10 or header_entropy > 4.5):
+    # Only invoke IsolationForest if metrics diverge from normal baseline
+    if _iso_forest is not None and (payload_size > 5000 or velocity > 25 or header_entropy > 5.0):
         try:
             features = np.array([[velocity, payload_size, header_entropy]])
             iso_pred = int(_iso_forest.predict(features)[0])  # -1 for anomaly, 1 for normal
@@ -132,7 +153,7 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
         except Exception as e:
             logger.debug(f"IsolationForest prediction error: {e}")
 
-    if velocity > 15 or payload_size > 5000:
+    if velocity > 30:
         iso_pred = -1
 
     # 3. Combine Evaluation Rules
@@ -141,20 +162,20 @@ def detect_threat_locally(telemetry: dict, raw_payload: str = "") -> dict:
     threat_type = "NORMAL"
     if sqli_detected:
         threat_type = "SQL_INJECTION"
-    elif velocity > 15:
+    elif velocity > 30:
         threat_type = "HIGH_VELOCITY_DDOS"
     elif iso_pred == -1:
         threat_type = "ISOLATION_FOREST_ANOMALY"
 
     # Compute normalized anomaly score (0.0 to 1.0)
     if threat_type == "SQL_INJECTION":
-        anomaly_score = max(confidence, 0.88)
+        anomaly_score = max(confidence, 0.95)
     elif threat_type == "HIGH_VELOCITY_DDOS":
-        anomaly_score = min(0.99, 0.6 + (velocity / 50.0))
+        anomaly_score = min(0.99, 0.70 + (velocity / 100.0))
     elif iso_pred == -1:
         anomaly_score = min(0.85, max(0.65, 0.75 - decision_score))
     else:
-        anomaly_score = max(0.12, round(confidence * 0.5, 4))
+        anomaly_score = 0.08
 
     return {
         "is_anomaly": is_anomaly,
@@ -175,6 +196,7 @@ def detect_anomaly(payload: str, request_rate: int) -> bool:
     }
     result = detect_threat_locally(telemetry, raw_payload=payload)
     return result["is_anomaly"]
+
 
 
 if __name__ == "__main__":

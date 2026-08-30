@@ -35,17 +35,32 @@ class BulkDataRequest(BaseModel):
     items: List[Dict[str, Any]] = Field([], json_schema_extra={"example": [{"id": "1", "val": "abc"}]})
 
 
-SQLI_PATTERNS = [
-    "' OR '1'='1",
-    "' or '1'='1",
-    "UNION SELECT",
-    "union select",
-    "DROP TABLE",
-    "drop table",
-    "--",
-    "';",
-    "1=1"
-]
+try:
+    from ml_engine.inference import has_sqli_syntax
+except Exception:
+    import re
+    import urllib.parse
+    SQLI_REGEXES = [
+        r"('|\"|`)\s*(or|and)\s*(\d+|\w+|'|\")\s*(=|<|>|!=|like)\s*(\d+|\w+|'|\")",
+        r"\b(or|and)\s+\d+\s*=\s*\d+",
+        r"('|\"|`)\s*--",
+        r"--\s*$",
+        r"/\*.*?\*/",
+        r"\bunion\s+(all\s+)?select\b",
+        r"\b(drop|truncate|alter)\s+table\b",
+        r"\b(insert\s+into|delete\s+from|update\s+\w+\s+set)\b",
+        r"\b(exec|execute)\s*\(",
+        r"\b(sleep|benchmark|waitfor\s+delay|pg_sleep)\s*\(",
+        r"('|\"|`)\s*;\s*(drop|select|insert|delete|update|exec)",
+        r"'\s*or\s*'1'='1",
+        r"'\s*or\s*1=1",
+        r"admin'\s*--",
+    ]
+    def has_sqli_syntax(payload: str) -> bool:
+        if not payload:
+            return False
+        unq = urllib.parse.unquote_plus(str(payload)).lower()
+        return any(re.search(p, unq, re.IGNORECASE) for p in SQLI_REGEXES)
 
 XSS_PATTERNS = [
     "<script>",
@@ -66,11 +81,12 @@ async def login_target(request: Request, credentials: LoginRequest = Body(...)):
     password = credentials.password
 
     # Check for SQL Injection syntax
-    has_sqli = any(p in username for p in SQLI_PATTERNS) or any(p in password for p in SQLI_PATTERNS)
+    has_sqli = has_sqli_syntax(username) or has_sqli_syntax(password)
 
     if hasattr(request.state, "telemetry") and isinstance(request.state.telemetry, dict):
         request.state.telemetry["is_potential_sqli"] = has_sqli
         request.state.telemetry["raw_payload"] = f"username={username}&password={password}"
+
     if has_sqli:
         redis_client = getattr(request.app.state, "redis", None) or tracker_instance.redis
         await block_ip(redis_client, client_ip, duration_seconds=3600)
@@ -126,13 +142,14 @@ async def search_target(request: Request, q: str = Query(..., examples=["laptop"
     Simulated search target endpoint vulnerable to SQL Injection & XSS probes.
     """
     client_ip = get_client_ip(request)
-
-    is_sqli = any(p in q for p in SQLI_PATTERNS)
-    is_xss = any(p in q for p in XSS_PATTERNS)
+    is_sqli = has_sqli_syntax(q)
+    is_xss = any(p in q.lower() for p in XSS_PATTERNS)
 
     if hasattr(request.state, "telemetry") and isinstance(request.state.telemetry, dict):
         request.state.telemetry["is_potential_sqli"] = is_sqli
         request.state.telemetry["is_potential_xss"] = is_xss
+        request.state.telemetry["raw_payload"] = f"q={q}"
+
 
     if is_sqli or is_xss:
         attack_type = "SQL_INJECTION" if is_sqli else "XSS_ATTACK"

@@ -120,7 +120,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                  Strata
+                  NibDefender
                 </h1>
                 <span className="text-slate-500 text-xs">•</span>
                 <span className={`text-sm font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
@@ -161,25 +161,43 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
 
             {/* Status Pill */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
-              <span className="font-semibold text-xs tracking-wide">Protected</span>
-            </div>
-
-            {/* Sub-15ms ML Inference Latency Pill */}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] ${
-              isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-950/60 border-indigo-500/30 text-indigo-300'
-            }`} title="100% Offline Local Scikit-Learn Inference Latency">
-              <Zap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span>ML Latency: <span className="text-emerald-500 font-bold">~9.3ms</span></span>
-            </div>
-
-            {/* Backend connection indicator */}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] ${
-              isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-slate-900/60 border-white/[0.06] text-slate-400'
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors ${
+              isLive
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
             }`}>
-              <Server className="w-3.5 h-3.5 text-slate-500" />
-              <span>{isLive ? 'Backend: Live' : 'Backend: Fallback (Sim)'}</span>
+              <span className={`w-2 h-2 rounded-full inline-block animate-pulse ${isLive ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+              <span className="font-semibold text-xs tracking-wide">{isLive ? 'Protected' : 'Standby (Sim)'}</span>
+            </div>
+
+            {/* Live Gateway & ML Latency Pill */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] transition-colors ${
+              isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-950/60 border-indigo-500/30 text-indigo-300'
+            }`} title="Live API Gateway & Threat Inspection Latency">
+              <Zap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+              <span>Latency: <span className="text-emerald-500 font-bold">{meta?.latencyMs !== undefined ? `${meta.latencyMs}ms` : '~9.3ms'}</span></span>
+            </div>
+
+            {/* Color-Reactive Backend Connection Indicator */}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] transition-all duration-300 ${
+              isLive
+                ? isLight
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm'
+                  : 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                : isLight
+                  ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-sm'
+                  : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+            }`} title={isLive ? "FastAPI Security Gateway: Live & Connected" : "Backend Offline: Running Client Simulation"}>
+              <Server className={`w-3.5 h-3.5 ${isLive ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  {isLive && (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  )}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                </span>
+                <span className="font-bold tracking-tight">{isLive ? 'Backend: Live' : 'Backend: Fallback (Sim)'}</span>
+              </div>
             </div>
 
             {/* Last updated timestamp */}

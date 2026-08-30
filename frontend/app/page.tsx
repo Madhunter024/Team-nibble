@@ -33,7 +33,7 @@ export default function Home() {
   // Initialize theme from localStorage and traffic history on first mount
   useEffect(() => {
     setTrafficHistory(generateInitialTrafficHistory(15));
-    const savedTheme = (localStorage.getItem('strata_theme') || localStorage.getItem('nibdefender_theme')) as 'dark' | 'light';
+    const savedTheme = localStorage.getItem('nibdefender_theme') as 'dark' | 'light';
     if (savedTheme) {
       setTheme(savedTheme);
     }
@@ -42,7 +42,7 @@ export default function Home() {
   const handleToggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('strata_theme', next);
+      localStorage.setItem('nibdefender_theme', next);
       return next;
     });
   }, []);
