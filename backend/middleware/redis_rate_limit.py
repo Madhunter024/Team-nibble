@@ -9,7 +9,7 @@ from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
 
-logger = logging.getLogger("nibdefender.rate_limit")
+logger = logging.getLogger("strata.rate_limit")
 
 # --- ML Interface Contract Import Wrapper ---
 try:
@@ -66,7 +66,7 @@ class ThreatTracker:
                     "id": "alert_init_1",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "severity": "LOW",
-                    "message": "Nibdefender Threat Defense Gateway started successfully."
+                    "message": "STRATA Threat Defense Gateway started successfully."
                 }
             ]
         }

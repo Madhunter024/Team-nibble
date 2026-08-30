@@ -1,3 +1,3 @@
 """
-Nibdefender Backend Services Package
+STRATA Backend Services Package
 """

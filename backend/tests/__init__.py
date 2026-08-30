@@ -1,3 +1,3 @@
 """
-Nibdefender Backend Test Package
+STRATA Backend Test Package
 """

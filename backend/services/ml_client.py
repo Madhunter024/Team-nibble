@@ -23,7 +23,7 @@ except ImportError:
     from middleware.rate_limiter import block_ip
     from middleware.redis_rate_limit import tracker_instance
 
-logger = logging.getLogger("nibdefender.ml_client")
+logger = logging.getLogger("strata.ml_client")
 
 
 async def evaluate_request_anomaly(telemetry_data: dict, redis_client=None, raw_payload: str = "") -> dict:

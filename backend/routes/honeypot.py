@@ -13,7 +13,7 @@ except ImportError:
     from middleware.rate_limiter import get_client_ip, block_ip
     from middleware.redis_rate_limit import tracker_instance
 
-logger = logging.getLogger("nibdefender.honeypot")
+logger = logging.getLogger("strata.honeypot")
 
 router = APIRouter(tags=["Active Security Honeypots"])
 
@@ -63,7 +63,7 @@ async def trigger_honeypot(request: Request, trap_name: str) -> JSONResponse:
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
         content={
-            "error": "Access Denied: Honeypot trap triggered by Nibdefender Threat Gateway",
+            "error": "Access Denied: Honeypot trap triggered by STRATA Threat Gateway",
             "trap": trap_name,
             "ip": client_ip,
             "path": path

@@ -17,7 +17,7 @@ TARGET_BASE_URL = os.getenv("TARGET_BASE_URL", "http://localhost:8000")
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "NibdefenderAttackerBot/2.0",
+    "STRATAAttackerBot/2.0",
     "sqlmap/1.7.2#stable (https://sqlmap.org)",
     "Nikto/2.1.6",
     "Python-urllib/3.10"
@@ -157,7 +157,7 @@ def simulate_honeypot_hit():
 
 def main():
     print("==================================================")
-    print("🏴‍☠️ Nibdefender Attacker Simulation Suite v2.0")
+    print("🏴‍☠️ STRATA Attacker Simulation Suite v2.0")
     print(f"Targeting: {TARGET_BASE_URL}")
     print("Press Ctrl+C to terminate.")
     print("==================================================")

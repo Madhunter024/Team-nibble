@@ -1,13 +1,13 @@
-# 🛡️ Nibdefender
+# 🛡️ STRATA
 
-**Nibdefender** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. Nibdefender combines FastAPI backend security middleware, Redis sliding-window rate limiting, a local dual-engine ML threat detector (**Hugging Face MobileBERT + Scikit-Learn IsolationForest**), and a Next.js command dashboard for real-time security operations.
+**STRATA** is an AI-powered, real-time threat detection and rate-limiting system built for high-concurrency API protection. STRATA combines FastAPI backend security middleware, Redis sliding-window rate limiting, a local dual-engine ML threat detector (**Hugging Face MobileBERT + Scikit-Learn IsolationForest**), and a Next.js command dashboard for real-time security operations.
 
 ---
 
 ## 🏗️ Monorepo Architecture
 
 ```
-Nibdefender/
+STRATA/
 ├── backend/               # FastAPI Security Gateway & Middleware
 │   ├── config.py          # Pydantic Settings configuration & env parser
 │   ├── main.py            # Gateway entry point, lifespan & route registration
@@ -41,7 +41,7 @@ Nibdefender/
 
 ## 🧠 Dual-Engine ML Architecture
 
-Nibdefender utilizes a **100% local, sub-15ms dual-model threat detection pipeline** that runs completely offline on CPU without external API dependencies:
+STRATA utilizes a **100% local, sub-15ms dual-model threat detection pipeline** that runs completely offline on CPU without external API dependencies:
 
 1. **Hugging Face MobileBERT (`cssupport/mobilebert-sql-injection-detect`)**:
    - Pre-trained transformer sequence classification model fine-tuned for deep SQL Injection vector and syntax analysis.
@@ -54,7 +54,7 @@ Nibdefender utilizes a **100% local, sub-15ms dual-model threat detection pipeli
 
 ## 📦 Backend Dependencies & Requirements
 
-The Nibdefender backend gateway relies on the following core Python libraries:
+The STRATA backend gateway relies on the following core Python libraries:
 
 | Dependency | Minimum Version | Purpose |
 | :--- | :--- | :--- |

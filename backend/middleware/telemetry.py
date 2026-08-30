@@ -26,7 +26,7 @@ except ImportError:
     except ImportError:
         evaluate_request_anomaly = None
 
-logger = logging.getLogger("nibdefender.telemetry")
+logger = logging.getLogger("strata.telemetry")
 
 
 def calculate_shannon_entropy(text: str) -> float:

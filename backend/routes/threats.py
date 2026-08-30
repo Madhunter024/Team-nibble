@@ -13,7 +13,7 @@ except ImportError:
     from middleware.rate_limiter import unblock_ip, get_client_ip
     from middleware.redis_rate_limit import tracker_instance
 
-logger = logging.getLogger("nibdefender.threats")
+logger = logging.getLogger("strata.threats")
 
 router = APIRouter(prefix="/api/v1/threats", tags=["Threat Observability & Dashboard"])
 

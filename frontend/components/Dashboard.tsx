@@ -120,7 +120,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                  NibDefender
+                  STRATA
                 </h1>
                 <span className="text-slate-500 text-xs">•</span>
                 <span className={`text-sm font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>

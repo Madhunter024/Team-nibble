@@ -1,6 +1,6 @@
-# 🧠 Nibdefender Local Machine Learning Engine
+# 🧠 STRATA Local Machine Learning Engine
 
-The **Nibdefender ML Engine** provides sub-15ms, 100% offline threat detection for web applications and API gateways. It operates completely locally using Hugging Face **MobileBERT** and Scikit-Learn **IsolationForest**, removing external cloud API dependencies and ensuring privacy, resilience, and ultra-low latency.
+The **STRATA ML Engine** provides sub-15ms, 100% offline threat detection for web applications and API gateways. It operates completely locally using Hugging Face **MobileBERT** and Scikit-Learn **IsolationForest**, removing external cloud API dependencies and ensuring privacy, resilience, and ultra-low latency.
 
 ---
 

@@ -10,7 +10,7 @@ INCIDENT_LOGS = []
 @router.get("/public/ping")
 async def ping():
     """Public health check endpoint."""
-    return {"status": "ok", "message": "Nibdefender security core online"}
+    return {"status": "ok", "message": "STRATA security core online"}
 
 @router.post("/login")
 async def login(credentials: Dict[str, Any] = Body(...)):
@@ -50,7 +50,7 @@ async def get_profile(payload: dict = Depends(verify_jwt)):
         "user_id": 1042,
         "username": payload.get("sub", "user"),
         "role": payload.get("role", "member"),
-        "email": "target_user@nibdefender.io"
+        "email": "target_user@strata.io"
     }
 
 @router.get("/payment/transfer")

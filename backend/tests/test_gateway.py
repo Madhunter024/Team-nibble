@@ -32,7 +32,7 @@ def test_root_endpoint():
     response = client.get("/", headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert data.get("system") == "Nibdefender API Gateway"
+    assert data.get("system") == "STRATA API Gateway"
 
 
 def test_rate_limiting_middleware():

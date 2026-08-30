@@ -1,3 +1,3 @@
 """
-Nibdefender Security & Rate Limiting Middleware Package
+STRATA Security & Rate Limiting Middleware Package
 """

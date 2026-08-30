@@ -5,7 +5,7 @@ import logging
 import threading
 from typing import Dict, Any, Optional
 
-logger = logging.getLogger("nibdefender.ml_inference")
+logger = logging.getLogger("strata.ml_inference")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ISO_MODEL_PATH = os.path.join(BASE_DIR, "iso_forest.joblib")

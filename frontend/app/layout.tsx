@@ -2,7 +2,7 @@ import React from 'react';
 import './globals.css';
 
 export const metadata = {
-  title: 'Nibdefender | Real-time Threat Intelligence',
+  title: 'STRATA | Real-time Threat Intelligence',
   description: 'AI & Redis Powered Security Operations Dashboard for API Threat Mitigation',
 };
 

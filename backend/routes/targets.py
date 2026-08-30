@@ -15,7 +15,7 @@ except ImportError:
     from middleware.auth import create_access_token
     from middleware.redis_rate_limit import tracker_instance
 
-logger = logging.getLogger("nibdefender.targets")
+logger = logging.getLogger("strata.targets")
 
 router = APIRouter(prefix="/api/v1", tags=["Attacker Simulation Targets"])
 
@@ -112,7 +112,7 @@ async def login_target(request: Request, credentials: LoginRequest = Body(...)):
 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Malicious syntax detected by Nibdefender WAF engine."
+            detail="Malicious syntax detected by STRATA WAF engine."
         )
 
     # Check valid test credentials
