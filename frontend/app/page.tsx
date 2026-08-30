@@ -17,6 +17,7 @@ import {
 export default function Home() {
   const [metrics, setMetrics] = useState<ThreatMetrics>(initialMockData);
   const [samplingRate, setSamplingRate] = useState<number>(1.0);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [meta, setMeta] = useState<ApiResponseMeta>({
     isFallback: true,
     timestamp: "2026-08-28T18:45:00.000Z",
@@ -29,9 +30,21 @@ export default function Home() {
   const lastTotalReqsRef = useRef<number | null>(null);
   const lastBlockedReqsRef = useRef<number | null>(null);
 
-  // Initialize traffic history on first mount (client-side only to avoid hydration mismatch)
+  // Initialize theme from localStorage and traffic history on first mount
   useEffect(() => {
     setTrafficHistory(generateInitialTrafficHistory(15));
+    const savedTheme = localStorage.getItem('nibdefender_theme') as 'dark' | 'light';
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  const handleToggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('nibdefender_theme', next);
+      return next;
+    });
   }, []);
 
   // Poll function to fetch metrics every 1 second
@@ -42,7 +55,27 @@ export default function Home() {
 
     try {
       const response = await fetchThreatMetrics();
-      setMetrics(response.data);
+      // Extract IPs from recent alerts to ensure real-time blocked sources updates
+      const alertIps: string[] = [];
+      const ipRegex = /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g;
+      (response.data.recent_alerts || []).forEach((alert) => {
+        const matches = alert.message.match(ipRegex);
+        if (matches) {
+          matches.forEach((ip) => {
+            if (ip !== '127.0.0.1' && ip !== '0.0.0.0' && !alertIps.includes(ip)) {
+              alertIps.push(ip);
+            }
+          });
+        }
+      });
+
+      const mergedBlockedIps = Array.from(new Set([...alertIps, ...(response.data.blocked_ips_list || [])]));
+
+      setMetrics({
+        ...response.data,
+        blocked_ips_list: mergedBlockedIps,
+        blocked_ips_count: mergedBlockedIps.length,
+      });
       setMeta(response.meta);
 
       const now = new Date();
@@ -184,11 +217,17 @@ export default function Home() {
     ]);
   }, []);
 
+  const isLight = theme === 'light';
+
   return (
-    <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-[#080b11]">
+    <div className={`flex flex-col lg:flex-row h-screen overflow-hidden transition-colors ${
+      isLight ? 'bg-slate-100 text-slate-900 light-mode' : 'bg-[#080b11] text-slate-100'
+    }`}>
       {/* Left Panel: Attacker Console (40%) */}
-      <div className="lg:w-[40%] h-1/2 lg:h-full p-4 lg:p-6 border-b lg:border-b-0 lg:border-r border-white/[0.06] overflow-y-auto">
-        <AttackerConsole />
+      <div className={`lg:w-[40%] h-1/2 lg:h-full p-4 lg:p-6 border-b lg:border-b-0 lg:border-r overflow-y-auto ${
+        isLight ? 'border-slate-300 bg-slate-200/50' : 'border-white/[0.06] bg-[#080b11]'
+      }`}>
+        <AttackerConsole theme={theme} onToggleTheme={handleToggleTheme} />
       </div>
 
       {/* Right Panel: Defender CISO Dashboard (60%) */}
@@ -199,10 +238,12 @@ export default function Home() {
           trafficHistory={trafficHistory}
           loading={loading}
           samplingRate={samplingRate}
+          theme={theme}
           onRefresh={handleRefresh}
           onUnblockIp={handleUnblockIp}
           onSamplingRateChange={handleSamplingRateChange}
           onTriggerSimulatedAttack={handleTriggerSimulatedAttack}
+          onToggleTheme={handleToggleTheme}
         />
       </div>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Terminal, Zap, ShieldAlert, Activity } from 'lucide-react';
+import { Terminal, Zap, ShieldAlert, Activity, Sun, Moon } from 'lucide-react';
 
 interface LogEntry {
   id: string;
@@ -13,7 +13,12 @@ interface LogEntry {
   type: 'clean' | 'attack' | 'ddos';
 }
 
-export const AttackerConsole: React.FC = () => {
+interface AttackerConsoleProps {
+  theme?: 'dark' | 'light';
+  onToggleTheme?: () => void;
+}
+
+export const AttackerConsole: React.FC<AttackerConsoleProps> = ({ theme = 'dark', onToggleTheme }) => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isAttacking, setIsAttacking] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -110,57 +115,65 @@ export const AttackerConsole: React.FC = () => {
     setTimeout(() => setIsAttacking(false), 120 * 20 + 500);
   };
 
-  const [customPayload, setCustomPayload] = useState("SELECT * FROM users WHERE '1'='1' --");
-  const [customEndpoint, setCustomEndpoint] = useState("/api/v1/auth/login");
-
-  const handleCustomAttack = async () => {
-    try {
-      const res = await fetch(`${API_URL}${customEndpoint}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Forwarded-For': generateRandomIp()
-        },
-        body: JSON.stringify({ payload: customPayload, input: customPayload }),
-      });
-      const data = await res.json().catch(() => ({}));
-      addLog({
-        method: 'POST',
-        endpoint: customEndpoint,
-        status: res.status,
-        response: res.status === 403 ? 'Forbidden - Local ML Quarantined' : (res.status === 429 ? 'Too Many Requests - Rate Limited' : JSON.stringify(data).substring(0, 45)),
-        type: 'attack'
-      });
-    } catch (err: any) {
-      addLog({ method: customEndpoint, endpoint: customEndpoint, status: 'ERR', response: err.message, type: 'attack' });
-    }
-  };
+  const isLight = theme === 'light';
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl">
+    <div className={`flex flex-col h-full rounded-xl overflow-hidden shadow-2xl transition-colors ${
+      isLight ? 'bg-white border border-slate-300' : 'bg-zinc-950 border border-slate-800'
+    }`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900 border-b border-slate-800">
+      <div className={`flex items-center justify-between px-4 py-3 border-b ${
+        isLight ? 'bg-slate-100 border-slate-200' : 'bg-zinc-900 border-slate-800'
+      }`}>
         <div className="flex items-center gap-2">
           <Terminal className="w-5 h-5 text-red-500" />
-          <h2 className="text-sm font-bold text-slate-200 tracking-wide">Red-Team Traffic Generator</h2>
+          <h2 className={`text-sm font-bold tracking-wide ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+            Red-Team Traffic Generator
+          </h2>
         </div>
-        <div className="px-2 py-1 bg-red-950/30 border border-red-900/50 rounded text-[10px] font-mono text-red-400">
-          TARGET: {API_URL}/api/v1/data
+        <div className="flex items-center gap-2">
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`p-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                isLight ? 'bg-white hover:bg-slate-200 border-slate-300 text-slate-700' : 'bg-zinc-800 hover:bg-zinc-700 border-slate-700 text-slate-300'
+              }`}
+              title="Toggle Dark / Light Mode"
+            >
+              {isLight ? <Moon className="w-3.5 h-3.5 text-indigo-600" /> : <Sun className="w-3.5 h-3.5 text-amber-400" />}
+              <span className="hidden sm:inline">{isLight ? 'Dark' : 'Light'}</span>
+            </button>
+          )}
+          <div className={`px-2 py-1 rounded text-[10px] font-mono border ${
+            isLight ? 'bg-red-50 border-red-200 text-red-700' : 'bg-red-950/30 border-red-900/50 text-red-400'
+          }`}>
+            TARGET: {API_URL}/api/v1/data
+          </div>
         </div>
       </div>
 
       {/* Controls */}
-      <div className="p-4 bg-zinc-900/50 border-b border-slate-800 flex flex-col gap-3">
+      <div className={`p-4 border-b flex flex-col gap-3 ${
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-zinc-900/50 border-slate-800'
+      }`}>
         <button
           onClick={handleCleanTraffic}
-          className="flex items-center justify-center gap-2 w-full py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-lg transition-colors border border-slate-700"
+          className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 text-sm font-medium rounded-lg transition-colors border shadow-sm ${
+            isLight
+              ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+          }`}
         >
-          <Activity className="w-4 h-4 text-emerald-400" />
+          <Activity className="w-4 h-4 text-emerald-500" />
           Send Clean Traffic
         </button>
         <button
           onClick={handleSqlInjection}
-          className="flex items-center justify-center gap-2 w-full py-2 px-4 bg-amber-950/50 hover:bg-amber-900/60 text-amber-500 text-sm font-medium rounded-lg transition-colors border border-amber-900/50"
+          className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 text-sm font-medium rounded-lg transition-colors border ${
+            isLight
+              ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+              : 'bg-amber-950/50 hover:bg-amber-900/60 text-amber-500 border-amber-900/50'
+          }`}
         >
           <ShieldAlert className="w-4 h-4" />
           Execute SQL Injection
@@ -168,56 +181,35 @@ export const AttackerConsole: React.FC = () => {
         <button
           onClick={handleDdosSpike}
           disabled={isAttacking}
-          className="flex items-center justify-center gap-2 w-full py-2 px-4 bg-red-950/50 hover:bg-red-900/60 disabled:opacity-50 text-red-500 text-sm font-medium rounded-lg transition-colors border border-red-900/50"
+          className={`flex items-center justify-center gap-2 w-full py-2.5 px-4 text-sm font-medium rounded-lg transition-colors border disabled:opacity-50 ${
+            isLight
+              ? 'bg-red-50 hover:bg-red-100 text-red-900 border-red-300'
+              : 'bg-red-950/50 hover:bg-red-900/60 text-red-500 border-red-900/50'
+          }`}
         >
           <Zap className="w-4 h-4" />
           {isAttacking ? 'Firing...' : 'Launch DDoS Spike'}
         </button>
-
-        {/* Custom Attack Payload Lab */}
-        <div className="mt-2 pt-3 border-t border-slate-800 flex flex-col gap-2">
-          <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
-            Custom Attack Payload Lab:
-          </div>
-          <input
-            type="text"
-            value={customEndpoint}
-            onChange={(e) => setCustomEndpoint(e.target.value)}
-            placeholder="Target Endpoint e.g. /api/v1/auth/login"
-            className="w-full px-3 py-1.5 bg-black border border-slate-800 rounded text-xs font-mono text-slate-300 focus:outline-none focus:border-red-900"
-          />
-          <input
-            type="text"
-            value={customPayload}
-            onChange={(e) => setCustomPayload(e.target.value)}
-            placeholder="Custom Payload e.g. <script>alert(1)</script>"
-            className="w-full px-3 py-1.5 bg-black border border-slate-800 rounded text-xs font-mono text-amber-400 focus:outline-none focus:border-amber-900"
-          />
-          <button
-            onClick={handleCustomAttack}
-            className="w-full py-1.5 px-3 bg-purple-950/50 hover:bg-purple-900/60 text-purple-300 text-xs font-mono font-medium rounded border border-purple-800/40 transition-colors"
-          >
-            ⚡ Fire Custom Payload
-          </button>
-        </div>
       </div>
 
       {/* Terminal Output */}
-      <div className="flex-1 p-4 overflow-y-auto bg-black font-mono text-xs leading-relaxed">
+      <div className={`flex-1 p-4 overflow-y-auto font-mono text-xs leading-relaxed ${
+        isLight ? 'bg-slate-900 text-slate-200' : 'bg-black text-slate-200'
+      }`}>
         {logs.length === 0 ? (
-          <div className="text-zinc-600 italic">Waiting for command execution...</div>
+          <div className="text-zinc-500 italic">Waiting for command execution...</div>
         ) : (
           logs.map((log) => (
             <div key={log.id} className="mb-1 flex flex-col sm:flex-row sm:gap-2">
               <span className="text-zinc-500 shrink-0">[{log.timestamp}]</span>
               <span className="text-slate-300">
-                <span className={log.type === 'clean' ? 'text-emerald-400' : log.type === 'attack' ? 'text-amber-400' : 'text-red-400'}>
+                <span className={log.type === 'clean' ? 'text-emerald-400 font-semibold' : log.type === 'attack' ? 'text-amber-400 font-semibold' : 'text-red-400 font-semibold'}>
                   {log.method}
                 </span>{' '}
                 {log.endpoint}
               </span>
               <span className="text-zinc-400 sm:ml-auto">
-                <span className={log.status === 200 ? 'text-emerald-500' : (log.status === 403 || log.status === 400 || log.status === 429) ? 'text-red-500' : 'text-amber-500'}>
+                <span className={log.status === 200 ? 'text-emerald-400 font-bold' : (log.status === 403 || log.status === 400 || log.status === 429) ? 'text-red-400 font-bold' : 'text-amber-400 font-bold'}>
                   {log.status}
                 </span>{' '}
                 - {log.response}
@@ -230,3 +222,4 @@ export const AttackerConsole: React.FC = () => {
     </div>
   );
 };
+

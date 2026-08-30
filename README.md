@@ -136,3 +136,11 @@ python attacker.py
 - **Live Blocked Sources Table:** Real-time table displaying quarantined IP addresses with dynamic relative timestamps (`Just now`, `5s ago`) and threat vector classifications.
 - **Custom Attack Payload Lab:** Red-Team simulation bench for testing SQLi, XSS, and custom payloads against target gateway endpoints.
 - **Split-Screen War Room Dashboard:** Next.js operator control panel featuring live ML Latency indicator (~9.3ms), ML Anomaly Index Gauge, and Enterprise Defense Ticker.
+
+
+cd /home/mad-hunter/Documents/Programs/Tigmaminds/backend
+source venv/bin/activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+cd /home/mad-hunter/Documents/Programs/Tigmaminds/frontend
+npm run dev

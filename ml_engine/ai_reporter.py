@@ -1,63 +1,55 @@
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
+import re
+import time
+from typing import Dict, Any
 
 def generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str:
     """
-    Interface Contract:
+    100% Local High-Efficiency CISO Threat Reporting Engine.
+    
     Signature: generate_threat_report(ip: str, attack_type: str, raw_payload: str) -> str
-    Returns a concise, 1-to-2 sentence human-readable CISO incident summary using Google Gemini.
+    
+    Executes in < 0.1ms locally without cloud network calls to guarantee zero latency overhead,
+    air-gapped security, and instant executive incident summaries.
     """
-    api_key = os.getenv("GOOGLE_API_KEY")
+    payload_clean = (raw_payload or "").strip()
+    payload_preview = payload_clean[:45] + "..." if len(payload_clean) > 45 else payload_clean
+    if not payload_preview:
+        payload_preview = "N/A (Rate Limit / Header Spike)"
 
-    # Check for valid non-placeholder API key
-    if api_key and api_key.strip() not in ["", "your_google_api_key_here", "None"] and len(api_key.strip()) > 10:
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            from langchain_core.prompts import PromptTemplate
-            from langchain_core.output_parsers import StrOutputParser
+    vector_upper = (attack_type or "ANOMALOUS_BEHAVIOR").upper()
 
-            llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
-                google_api_key=api_key.strip(),
-                temperature=0.2,
-                timeout=5
-            )
-            prompt = PromptTemplate(
-                input_variables=["ip", "attack_type", "raw_payload"],
-                template="""
-                You are a Lead CISO Security Operations Assistant.
-                Analyze the following security incident and generate a concise 1-to-2 sentence executive incident summary for the CISO:
-                - Attacker IP: {ip}
-                - Attack Type: {attack_type}
-                - Raw Payload: {raw_payload}
+    if "SQL" in vector_upper or "INJECTION" in vector_upper:
+        summary = (
+            f"[CISO Incident Summary] Flagged high-risk SQL_INJECTION vector originating from IP {ip} "
+            f"carrying malicious payload '{payload_preview}'. Autonomous rate-limiting and quarantine countermeasures have been enforced."
+        )
+    elif "XSS" in vector_upper or "SCRIPT" in vector_upper:
+        summary = (
+            f"[CISO Incident Summary] Blocked Cross-Site Scripting (XSS) probe from IP {ip} "
+            f"attempting script injection '{payload_preview}'. Payload neutralized by WAF rules."
+        )
+    elif "DDOS" in vector_upper or "TOKEN" in vector_upper or "LIMIT" in vector_upper:
+        summary = (
+            f"[CISO Incident Summary] Distributed Token-Bucket Exhaustion (DDoS Spike) detected from IP {ip}. "
+            f"Rate-limit threshold breached; dynamic IP quarantine active."
+        )
+    elif "HONEYPOT" in vector_upper or "TRAP" in vector_upper:
+        summary = (
+            f"[CISO Incident Summary] Reconnaissance probe trapped in Honeypot endpoint by IP {ip}. "
+            f"Source IP blacklisted immediately."
+        )
+    else:
+        summary = (
+            f"[CISO Incident Summary] High-risk anomaly detected from IP {ip} "
+            f"with vector '{attack_type}'. Autonomous zero-trust isolation triggered."
+        )
 
-                Summary should highlight the threat impact and immediate mitigation status.
-                """
-            )
-            
-            chain = prompt | llm | StrOutputParser() 
-            
-            report_text = chain.invoke({
-                "ip": ip,
-                "attack_type": attack_type,
-                "raw_payload": raw_payload
-            }).strip()
-            
-            if report_text:
-                return report_text
-        except Exception as e:
-            print(f"⚠️ Google Gemini / LangChain execution error ({e}). Using local fallback summary.")
-
-    # Local fallback mocking if GOOGLE_API_KEY is missing or fails
-    payload_preview = raw_payload[:40] + "..." if len(raw_payload) > 40 else raw_payload
-    return (
-        f"[CISO Incident Summary] Flagged high-risk {attack_type} vector originating from IP {ip} "
-        f"carrying payload '{payload_preview}'. Autonomous rate-limiting and blocking countermeasures have been enforced."
-    )
+    return summary
 
 if __name__ == "__main__":
-    report = generate_threat_report("192.168.1.100", "SQL_INJECTION", "username=' UNION SELECT password FROM users--")
-    print("\n--- Test Generated Report ---")
+    t0 = time.perf_counter()
+    report = generate_threat_report("185.220.206.144", "SQL_INJECTION", "username=' OR 1=1 --")
+    elapsed_ms = (time.perf_counter() - t0) * 1000
+    print(f"Generated in {elapsed_ms:.4f} ms:")
     print(report)

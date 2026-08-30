@@ -19,6 +19,8 @@ import {
   Globe,
   Cpu,
   Sliders,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -27,10 +29,12 @@ interface DashboardProps {
   trafficHistory?: TrafficDataPoint[];
   loading?: boolean;
   samplingRate?: number;
+  theme?: 'dark' | 'light';
   onRefresh?: () => void;
   onUnblockIp?: (ip: string) => void;
   onSamplingRateChange?: (newRate: number) => void;
   onTriggerSimulatedAttack?: () => void;
+  onToggleTheme?: () => void;
 }
 
 const SAMPLING_OPTIONS = [
@@ -46,13 +50,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   trafficHistory = [],
   loading = false,
   samplingRate,
+  theme = 'dark',
   onRefresh,
   onUnblockIp,
   onSamplingRateChange,
+  onToggleTheme,
 }) => {
   const [lastUpdatedTime, setLastUpdatedTime] = useState<string>('');
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  const isLight = theme === 'light';
 
   useEffect(() => {
     setIsMounted(true);
@@ -97,13 +105,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
   ];
 
   return (
-    <div className="bg-[#080b11] text-slate-100 p-4 sm:p-6 lg:p-8 ambient-bg selection:bg-cyan-500 selection:text-slate-950 h-full">
+    <div className={`${isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#080b11] text-slate-100'} p-4 sm:p-6 lg:p-8 ambient-bg selection:bg-cyan-500 selection:text-slate-950 h-full transition-colors`}>
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ========================================================= */}
         {/* 1. HEADER */}
         {/* ========================================================= */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.06]">
+        <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b ${isLight ? 'border-slate-300' : 'border-white/[0.06]'}`}>
           {/* Logo & Title */}
           <div className="flex items-center gap-3.5">
             <div className="p-2.5 bg-cyan-950/40 border border-cyan-500/20 rounded-xl text-cyan-400">
@@ -111,15 +119,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight text-white">
+                <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   NibDefender
                 </h1>
                 <span className="text-slate-500 text-xs">•</span>
-                <span className="text-sm font-medium text-slate-200">
+                <span className={`text-sm font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
                   Security Operations
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'} mt-0.5`}>
                 Real-time threat visibility
               </p>
             </div>
@@ -127,6 +135,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           {/* System Status Indicator & Metadata */}
           <div className="flex flex-wrap items-center gap-3 text-xs">
+            {/* Theme Toggle Button */}
+            {onToggleTheme && (
+              <button
+                onClick={onToggleTheme}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
+                  isLight
+                    ? 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
+                    : 'bg-slate-900/60 hover:bg-slate-800 border-white/[0.06] text-slate-200'
+                }`}
+                title="Toggle Dark / Light Theme"
+              >
+                {isLight ? (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Dark</span>
+                  </>
+                ) : (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Light</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Status Pill */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full">
               <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
@@ -134,19 +167,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Sub-15ms ML Inference Latency Pill */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-950/60 border border-indigo-500/30 rounded-lg text-indigo-300 font-mono text-[11px]" title="100% Offline Local Scikit-Learn Inference Latency">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] ${
+              isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-950/60 border-indigo-500/30 text-indigo-300'
+            }`} title="100% Offline Local Scikit-Learn Inference Latency">
               <Zap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span>ML Latency: <span className="text-emerald-400 font-bold">~9.3ms</span></span>
+              <span>ML Latency: <span className="text-emerald-500 font-bold">~9.3ms</span></span>
             </div>
 
             {/* Backend connection indicator */}
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 border border-white/[0.06] rounded-lg text-slate-400 font-mono text-[11px]">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] ${
+              isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-slate-900/60 border-white/[0.06] text-slate-400'
+            }`}>
               <Server className="w-3.5 h-3.5 text-slate-500" />
               <span>{isLive ? 'Backend: Live' : 'Backend: Fallback (Sim)'}</span>
             </div>
 
             {/* Last updated timestamp */}
-            <div className="text-slate-400 font-mono text-[11px] px-2.5 py-1.5 bg-slate-950/60 rounded-lg border border-white/[0.06]">
+            <div className={`font-mono text-[11px] px-2.5 py-1.5 rounded-lg border ${
+              isLight ? 'bg-white border-slate-200 text-slate-600' : 'bg-slate-950/60 border-white/[0.06] text-slate-400'
+            }`}>
               Last updated:{' '}
               <span suppressHydrationWarning>
                 {isMounted && lastUpdatedTime ? lastUpdatedTime : 'Just now'}
@@ -157,7 +196,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {onRefresh && (
               <button
                 onClick={onRefresh}
-                className="p-1.5 bg-slate-900/60 hover:bg-slate-800 border border-white/[0.06] text-slate-400 hover:text-slate-200 rounded-lg transition"
+                className={`p-1.5 border rounded-lg transition ${
+                  isLight ? 'bg-white hover:bg-slate-200 border-slate-300 text-slate-700' : 'bg-slate-900/60 hover:bg-slate-800 border-white/[0.06] text-slate-400 hover:text-slate-200'
+                }`}
                 title="Poll now"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -169,18 +210,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* ========================================================= */}
         {/* SUBTLE ENTERPRISE THREAT MITIGATION TICKER (Feature 5) */}
         {/* ========================================================= */}
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-950/70 border border-white/[0.06] rounded-xl text-xs text-slate-300 shadow-inner">
+        <div className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs shadow-sm border ${
+          isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-950/70 border-white/[0.06] text-slate-300'
+        }`}>
           <div className="flex items-center gap-2.5">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
             </span>
-            <span className="font-mono text-slate-400 uppercase tracking-wider text-[10px] font-semibold">Enterprise Defense Ticker:</span>
-            <span className="text-slate-200 font-medium">
-              <strong className="text-cyan-400 font-mono">{metrics.blocked_ips_count} malicious IPs</strong> quarantined seamlessly in background • Zero user friction
+            <span className={`font-mono uppercase tracking-wider text-[10px] font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Enterprise Defense Ticker:</span>
+            <span className={`font-medium ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+              <strong className="text-cyan-600 font-mono font-bold">{metrics.blocked_ips_count} malicious IPs</strong> quarantined seamlessly in background • Zero user friction
             </span>
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-[11px] font-mono text-slate-500">
+          <div className={`hidden sm:flex items-center gap-2 text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
             <span>Isolation Rate: 100%</span>
           </div>
         </div>
@@ -190,39 +233,47 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* ========================================================= */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Total Requests */}
-          <div className="glass-panel p-4 shadow-sm hover:border-white/[0.12] transition-all flex items-center justify-between">
+          <div className={`glass-panel p-4 shadow-sm transition-all flex items-center justify-between ${
+            isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'hover:border-white/[0.12]'
+          }`}>
             <div>
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <div className={`text-[11px] font-semibold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 Total Requests
               </div>
-              <div className="text-2xl font-bold font-mono text-slate-100 tracking-tight">
+              <div className={`text-2xl font-bold font-mono tracking-tight ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                 {metrics.total_requests.toLocaleString()}
               </div>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className={`mt-1 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 Processed real time
               </div>
             </div>
 
-            <div className="w-10 h-10 rounded-full bg-cyan-950/50 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0 ml-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ml-3 ${
+              isLight ? 'bg-cyan-50 border border-cyan-200 text-cyan-600' : 'bg-cyan-950/50 border border-cyan-500/20 text-cyan-400'
+            }`}>
               <Activity className="w-4 h-4" />
             </div>
           </div>
 
           {/* Card 2: Threats Blocked */}
-          <div className="glass-panel p-4 shadow-sm hover:border-white/[0.12] transition-all flex items-center justify-between">
+          <div className={`glass-panel p-4 shadow-sm transition-all flex items-center justify-between ${
+            isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'hover:border-white/[0.12]'
+          }`}>
             <div>
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <div className={`text-[11px] font-semibold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 Threats Blocked
               </div>
-              <div className="text-2xl font-bold font-mono text-slate-100 tracking-tight">
+              <div className={`text-2xl font-bold font-mono tracking-tight ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                 {metrics.blocked_ips_count}
               </div>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className={`mt-1 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 Malicious sources
               </div>
             </div>
 
-            <div className="w-10 h-10 rounded-full bg-rose-950/50 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0 ml-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ml-3 ${
+              isLight ? 'bg-rose-50 border border-rose-200 text-rose-600' : 'bg-rose-950/50 border border-rose-500/20 text-rose-400'
+            }`}>
               <Lock className="w-4 h-4" />
             </div>
           </div>
@@ -233,21 +284,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
             const isHigh = latestAnomaly > 0.6;
             const isMed = latestAnomaly > 0.35 && !isHigh;
             return (
-              <div className="glass-panel p-4 shadow-sm hover:border-white/[0.12] transition-all flex items-center justify-between">
+              <div className={`glass-panel p-4 shadow-sm transition-all flex items-center justify-between ${
+                isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'hover:border-white/[0.12]'
+              }`}>
                 <div>
-                  <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+                  <div className={`text-[11px] font-semibold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     ML Anomaly Index
                   </div>
-                  <div className={`text-2xl font-bold font-mono tracking-tight ${isHigh ? 'text-rose-400' : isMed ? 'text-amber-400' : 'text-cyan-400'}`}>
+                  <div className={`text-2xl font-bold font-mono tracking-tight ${
+                    isHigh ? (isLight ? 'text-rose-600' : 'text-rose-400') : isMed ? (isLight ? 'text-amber-600' : 'text-amber-400') : (isLight ? 'text-cyan-600' : 'text-cyan-400')
+                  }`}>
                     {latestAnomaly.toFixed(2)}
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-400">
+                  <div className={`mt-1 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     {isHigh ? 'CRITICAL SPIKE' : isMed ? 'SUSPICIOUS' : 'NORMAL PATTERN'}
                   </div>
                 </div>
 
                 <div className={`w-10 h-10 rounded-full border flex items-center justify-center shrink-0 ml-3 ${
-                  isHigh ? 'bg-rose-950/50 border-rose-500/40 text-rose-400' : isMed ? 'bg-amber-950/50 border-amber-500/40 text-amber-400' : 'bg-cyan-950/50 border-cyan-500/20 text-cyan-400'
+                  isHigh 
+                    ? (isLight ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-rose-950/50 border-rose-500/40 text-rose-400')
+                    : isMed 
+                    ? (isLight ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-amber-950/50 border-amber-500/40 text-amber-400')
+                    : (isLight ? 'bg-cyan-50 border-cyan-200 text-cyan-600' : 'bg-cyan-950/50 border-cyan-500/20 text-cyan-400')
                 }`}>
                   <Cpu className="w-4 h-4" />
                 </div>
@@ -256,20 +315,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
           })()}
 
           {/* Card 4: System Status */}
-          <div className="glass-panel p-4 shadow-sm hover:border-white/[0.12] transition-all flex items-center justify-between">
+          <div className={`glass-panel p-4 shadow-sm transition-all flex items-center justify-between ${
+            isLight ? 'bg-white border-slate-200 hover:border-slate-300' : 'hover:border-white/[0.12]'
+          }`}>
             <div>
-              <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+              <div className={`text-[11px] font-semibold uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 System Status
               </div>
-              <div className="text-2xl font-bold text-emerald-400 tracking-tight">
+              <div className="text-2xl font-bold text-emerald-500 tracking-tight">
                 Protected
               </div>
-              <div className="mt-1 text-[11px] text-slate-400">
+              <div className={`mt-1 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 Zero-Trust Active
               </div>
             </div>
 
-            <div className="w-10 h-10 rounded-full bg-emerald-950/50 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 ml-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ml-3 ${
+              isLight ? 'bg-emerald-50 border border-emerald-200 text-emerald-600' : 'bg-emerald-950/50 border border-emerald-500/20 text-emerald-400'
+            }`}>
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
@@ -279,20 +342,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* EXECUTIVE AI THREAT CARD */}
         {/* ========================================================= */}
         {metrics.recent_alerts && metrics.recent_alerts.length > 0 && metrics.recent_alerts[0].severity === 'HIGH' && (
-          <section className="relative overflow-hidden rounded-xl bg-slate-900/40 border border-indigo-500/30 p-1">
+          <section className={`relative overflow-hidden rounded-xl border p-1 ${
+            isLight ? 'bg-indigo-50/60 border-indigo-200 shadow-sm' : 'bg-slate-900/40 border-indigo-500/30'
+          }`}>
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-cyan-500/10 blur-xl"></div>
-            <div className="relative bg-slate-950/80 backdrop-blur-sm p-5 rounded-lg border border-white/5 flex flex-col gap-3">
+            <div className={`relative backdrop-blur-sm p-5 rounded-lg border flex flex-col gap-3 ${
+              isLight ? 'bg-white/90 border-indigo-100' : 'bg-slate-950/80 border-white/5'
+            }`}>
               <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-indigo-500/20 rounded-md">
-                  <Zap className="w-4 h-4 text-indigo-400" />
+                <div className={`p-1.5 rounded-md ${isLight ? 'bg-indigo-100 text-indigo-700' : 'bg-indigo-500/20 text-indigo-400'}`}>
+                  <Zap className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-indigo-300 tracking-wide uppercase">AI Threat Analysis (Local Scikit-Learn ML)</h3>
+                <h3 className={`text-sm font-bold tracking-wide uppercase ${isLight ? 'text-indigo-900' : 'text-indigo-300'}`}>AI Threat Analysis (Local Scikit-Learn ML)</h3>
                 <span className="ml-auto flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
                 </span>
               </div>
-              <p className="text-sm text-slate-300 leading-relaxed font-mono">
+              <p className={`text-sm leading-relaxed font-mono ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
                 {metrics.recent_alerts[0].message}
               </p>
             </div>
@@ -302,17 +369,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* ========================================================= */}
         {/* 2.5. API TRAFFIC SAMPLING OPTIONS */}
         {/* ========================================================= */}
-        <section className="glass-panel p-5 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-white/[0.06]">
+        <section className={`glass-panel p-5 shadow-sm ${isLight ? 'bg-white border-slate-200' : ''}`}>
+          <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b ${
+            isLight ? 'border-slate-200' : 'border-white/[0.06]'
+          }`}>
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-indigo-950/50 border border-indigo-500/20 rounded-lg text-indigo-400">
+              <div className={`p-2 rounded-lg ${isLight ? 'bg-indigo-50 border border-indigo-200 text-indigo-600' : 'bg-indigo-950/50 border border-indigo-500/20 text-indigo-400'}`}>
                 <Sliders className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-100 tracking-tight">
+                <h3 className={`text-sm font-semibold tracking-tight ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
                   API Traffic Sampling Rate
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                   Choose the ML anomaly detection sampling of the API
                 </p>
               </div>
@@ -320,14 +389,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Current Active Badge */}
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono text-slate-400">Active Rate:</span>
-              <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              <span className={`text-[11px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Active Rate:</span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold border ${
+                isLight ? 'bg-cyan-50 text-cyan-700 border-cyan-300' : 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'
+              }`}>
                 {Math.round(currentSamplingRate * 100)}% Sampling
               </span>
             </div>
           </div>
 
-          {/* Sampling Option Buttons: 20%, 40%, 50%, 100% */}
+          {/* Sampling Option Buttons: 25%, 50%, 75%, 100% */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {SAMPLING_OPTIONS.map((opt) => {
               const isSelected = Math.round(currentSamplingRate * 100) === Math.round(opt.rate * 100);
@@ -338,25 +409,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   onClick={() => onSamplingRateChange && onSamplingRateChange(opt.rate)}
                   className={`p-3.5 rounded-xl border text-left transition-all duration-200 cursor-pointer ${
                     isSelected
-                      ? 'bg-gradient-to-br from-cyan-950/80 via-slate-900 to-slate-900 border-cyan-400/70 shadow-[0_0_16px_rgba(6,182,212,0.25)] text-white ring-1 ring-cyan-400/50'
-                      : 'bg-slate-950/60 hover:bg-slate-900/80 border-white/[0.08] hover:border-white/[0.18] text-slate-300'
+                      ? (isLight
+                          ? 'bg-cyan-50/90 border-cyan-500 shadow-md ring-2 ring-cyan-500/40 text-slate-900'
+                          : 'bg-gradient-to-br from-cyan-950/80 via-slate-900 to-slate-900 border-cyan-400/70 shadow-[0_0_16px_rgba(6,182,212,0.25)] text-white ring-1 ring-cyan-400/50')
+                      : (isLight
+                          ? 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 text-slate-700'
+                          : 'bg-slate-950/60 hover:bg-slate-900/80 border-white/[0.08] hover:border-white/[0.18] text-slate-300')
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold font-mono tracking-tight text-white">
+                    <span className={`text-lg font-bold font-mono tracking-tight ${
+                      isLight ? (isSelected ? 'text-cyan-950' : 'text-slate-900') : 'text-white'
+                    }`}>
                       {opt.label}
                     </span>
                     {isSelected && (
                       <span className="flex h-2.5 w-2.5 relative">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
                       </span>
                     )}
                   </div>
-                  <div className="text-xs font-medium text-slate-200 mt-1.5">
+                  <div className={`text-xs font-semibold mt-1.5 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
                     {opt.subtitle}
                   </div>
-                  <div className={`text-[10px] font-mono mt-0.5 ${isSelected ? 'text-cyan-300 font-semibold' : 'text-slate-400'}`}>
+                  <div className={`text-[10px] font-mono mt-0.5 ${
+                    isSelected 
+                      ? (isLight ? 'text-cyan-800 font-bold' : 'text-cyan-300 font-semibold')
+                      : (isLight ? 'text-slate-500' : 'text-slate-400')
+                  }`}>
                     {opt.computeSaved}
                   </div>
                 </button>
@@ -369,7 +450,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* 3. TRAFFIC SECTION */}
         {/* ========================================================= */}
         <section>
-          <TrafficChart data={trafficHistory} />
+          <TrafficChart data={trafficHistory} theme={theme} />
         </section>
 
         {/* ========================================================= */}
@@ -377,13 +458,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* ========================================================= */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Threats Feed */}
-          <ThreatFeed alerts={metrics.recent_alerts} />
+          <ThreatFeed alerts={metrics.recent_alerts} theme={theme} />
 
           {/* Blocked Sources Table */}
           <BlockedIPsTable
             blockedIps={metrics.blocked_ips_list}
             alerts={metrics.recent_alerts}
             onUnblock={onUnblockIp}
+            theme={theme}
           />
         </section>
 

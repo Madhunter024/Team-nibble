@@ -94,23 +94,45 @@ class ThreatTracker:
 
     def increment_sampled_requests(self) -> int:
         """Increment count of requests processed by ML inspection."""
+        self.in_memory_metrics["sampled_requests_count"] += 1
         if self.redis:
             try:
-                return int(self.redis.incr("sampled_requests_count"))
+                val = self.redis.incr("sampled_requests_count")
+                return int(val)
             except Exception:
                 pass
-        self.in_memory_metrics["sampled_requests_count"] += 1
         return self.in_memory_metrics["sampled_requests_count"]
 
     def increment_bypassed_requests(self) -> int:
         """Increment count of requests that bypassed ML inspection to save compute."""
+        self.in_memory_metrics["bypassed_requests_count"] += 1
         if self.redis:
             try:
-                return int(self.redis.incr("bypassed_requests_count"))
+                val = self.redis.incr("bypassed_requests_count")
+                return int(val)
             except Exception:
                 pass
-        self.in_memory_metrics["bypassed_requests_count"] += 1
         return self.in_memory_metrics["bypassed_requests_count"]
+
+    def get_sampled_requests_count(self) -> int:
+        if self.redis:
+            try:
+                val = self.redis.get("sampled_requests_count")
+                if val is not None:
+                    return int(val)
+            except Exception:
+                pass
+        return self.in_memory_metrics.get("sampled_requests_count", 0)
+
+    def get_bypassed_requests_count(self) -> int:
+        if self.redis:
+            try:
+                val = self.redis.get("bypassed_requests_count")
+                if val is not None:
+                    return int(val)
+            except Exception:
+                pass
+        return self.in_memory_metrics.get("bypassed_requests_count", 0)
 
     def increment_total_requests(self) -> int:
         """Increment cumulative total requests count."""
@@ -291,8 +313,8 @@ class ThreatTracker:
             "blocked_ips_list": blocked_list,
             "sampling_rate": rate,
             "sampling_rate_pct": int(round(rate * 100)),
-            "sampled_requests_count": self.in_memory_metrics.get("sampled_requests_count", 0),
-            "bypassed_requests_count": self.in_memory_metrics.get("bypassed_requests_count", 0),
+            "sampled_requests_count": self.get_sampled_requests_count(),
+            "bypassed_requests_count": self.get_bypassed_requests_count(),
             "compute_saved_pct": int(round((1.0 - rate) * 100)),
             "current_anomaly_score": round(current_score, 4),
             "recent_alerts": self.get_recent_alerts(limit=25)
