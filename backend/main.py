@@ -48,7 +48,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger("nibdefender.main")
+logger = logging.getLogger("strata.main")
 
 
 class TokenRequestPayload(BaseModel):
@@ -93,7 +93,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Nibdefender API Gateway",
+    title="Strata API Gateway",
     description="Real-time FastAPI & Redis threat detection and rate limiting engine.",
     version="1.0.0",
     lifespan=lifespan
@@ -231,7 +231,7 @@ async def manual_unblock_ip(request: Request, payload: ManualUnblockPayload = Bo
 @app.get("/")
 async def root():
     return {
-        "system": "Nibdefender API Gateway",
+        "system": "Strata API Gateway",
         "status": "active",
         "docs": "/docs"
     }

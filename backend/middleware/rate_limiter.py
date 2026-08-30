@@ -19,7 +19,7 @@ try:
 except ImportError:
     from middleware.redis_rate_limit import tracker_instance
 
-logger = logging.getLogger("nibdefender.rate_limiter")
+logger = logging.getLogger("strata.rate_limiter")
 
 
 def get_client_ip(request: Request) -> str:
@@ -192,7 +192,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             tracker_instance.increment_blocked_requests()
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
-                content={"error": "Access Denied: IP blocked by Nibdefender Threat Gateway"}
+                content={"error": "Access Denied: IP blocked by Strata Threat Gateway"}
             )
 
         # 2. Sliding-Window Rate Check

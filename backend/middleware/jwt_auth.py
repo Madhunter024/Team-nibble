@@ -10,7 +10,7 @@ try:
 except ImportError:
     from config import settings
 
-SECRET_KEY = getattr(settings, "JWT_SECRET_KEY", "nibdefender_super_secret_jwt_key_2026_production")
+SECRET_KEY = getattr(settings, "JWT_SECRET_KEY", "strata_super_secret_jwt_key_2026_production")
 ALGORITHM = getattr(settings, "JWT_ALGORITHM", "HS256")
 
 security = HTTPBearer(auto_error=False)
