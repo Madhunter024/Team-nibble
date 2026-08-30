@@ -17,6 +17,7 @@ export interface ThreatMetrics {
   bypassed_requests_count?: number;
   compute_saved_pct?: number;
   current_anomaly_score?: number;
+  ml_latency_ms?: number;
 }
 
 export interface TrafficDataPoint {

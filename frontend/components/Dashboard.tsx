@@ -77,6 +77,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const currentSamplingRate = samplingRate !== undefined ? samplingRate : (metrics.sampling_rate ?? 1.0);
   const isLive = meta ? !meta.isFallback : false;
 
+  // Real-time Dynamic Protection Status
+  const anomalyScore = metrics.current_anomaly_score ?? 0.12;
+  const isMitigating = anomalyScore > 0.65;
+  const isElevated = anomalyScore > 0.35 && !isMitigating;
+
+  let protectionStatus = {
+    label: "Protected",
+    dotColor: "bg-emerald-400",
+    bgBorder: isLight ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+  };
+
+  if (!isLive) {
+    protectionStatus = {
+      label: "Simulation",
+      dotColor: "bg-amber-400",
+      bgBorder: isLight ? "bg-amber-50 border-amber-300 text-amber-700" : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+    };
+  } else if (isMitigating) {
+    protectionStatus = {
+      label: "Mitigating Attack",
+      dotColor: "bg-rose-400",
+      bgBorder: isLight ? "bg-rose-50 border-rose-300 text-rose-700 shadow-[0_0_12px_rgba(244,63,94,0.3)]" : "bg-rose-500/10 border-rose-500/30 text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.2)]"
+    };
+  } else if (isElevated) {
+    protectionStatus = {
+      label: "Shield Active",
+      dotColor: "bg-cyan-400",
+      bgBorder: isLight ? "bg-cyan-50 border-cyan-300 text-cyan-700" : "bg-cyan-500/10 border-cyan-500/20 text-cyan-400"
+    };
+  }
+
   const securityControls = [
     {
       name: "Zero-Trust",
@@ -118,15 +149,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Shield className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                  STRATA
-                </h1>
-                <span className="text-slate-500 text-xs">•</span>
-                <span className={`text-sm font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                  Security Operations
-                </span>
-              </div>
+              <h1 className={`text-xl font-bold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                Strata
+              </h1>
               <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'} mt-0.5`}>
                 Real-time threat visibility
               </p>
@@ -160,44 +185,22 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
             )}
 
-            {/* Status Pill */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors ${
-              isLive
-                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-            }`}>
-              <span className={`w-2 h-2 rounded-full inline-block animate-pulse ${isLive ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
-              <span className="font-semibold text-xs tracking-wide">{isLive ? 'Protected' : 'Standby (Sim)'}</span>
+            {/* Dynamic Real-time Protection Status Pill */}
+            <div className={`flex items-center gap-2 px-3 py-1.5 border rounded-full transition-all duration-300 ${protectionStatus.bgBorder}`}>
+              <span className={`w-2 h-2 rounded-full ${protectionStatus.dotColor} inline-block animate-pulse`}></span>
+              <span className="font-semibold text-xs tracking-wide">{protectionStatus.label}</span>
             </div>
 
-            {/* Live Gateway & ML Latency Pill */}
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] transition-colors ${
-              isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-900' : 'bg-indigo-950/60 border-indigo-500/30 text-indigo-300'
-            }`} title="Live API Gateway & Threat Inspection Latency">
-              <Zap className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span>Latency: <span className="text-emerald-500 font-bold">{meta?.latencyMs !== undefined ? `${meta.latencyMs}ms` : '~9.3ms'}</span></span>
-            </div>
-
-            {/* Color-Reactive Backend Connection Indicator */}
+            {/* Dynamic Real-time Backend connection indicator */}
             <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg font-mono text-[11px] transition-all duration-300 ${
-              isLive
-                ? isLight
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm'
-                  : 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-                : isLight
-                  ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-sm'
-                  : 'bg-amber-950/50 border-amber-500/40 text-amber-300'
-            }`} title={isLive ? "FastAPI Security Gateway: Live & Connected" : "Backend Offline: Running Client Simulation"}>
-              <Server className={`w-3.5 h-3.5 ${isLive ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
-              <div className="flex items-center gap-1.5">
-                <span className="relative flex h-2 w-2">
-                  {isLive && (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  )}
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${isLive ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-                </span>
-                <span className="font-bold tracking-tight">{isLive ? 'Backend: Live' : 'Backend: Fallback (Sim)'}</span>
-              </div>
+              isLive 
+                ? (isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300')
+                : (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-950/40 border-amber-500/30 text-amber-300')
+            }`}>
+              <Server className={`w-3.5 h-3.5 ${isLive ? 'text-emerald-400' : 'text-amber-400'}`} />
+              <span>
+                {isLive ? `Backend: Live (${meta?.latencyMs ?? 1}ms)` : 'Backend: Fallback (Sim)'}
+              </span>
             </div>
 
             {/* Last updated timestamp */}
