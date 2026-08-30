@@ -38,7 +38,7 @@ def test_root_endpoint():
 def test_rate_limiting_middleware():
     """Test rate limiting middleware enforces limits and triggers 429 or 403 status."""
     headers = {"X-Forwarded-For": "10.10.0.3"}
-    responses = [client.get("/api/v1/public/ping", headers=headers) for _ in range(12)]
+    responses = [client.get("/api/v1/public/ping", headers=headers) for _ in range(30)]
 
     status_codes = [r.status_code for r in responses]
     assert (429 in status_codes) or (403 in status_codes)

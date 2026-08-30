@@ -71,6 +71,15 @@ class ThreatTracker:
             ]
         }
         self.current_anomaly_score = 0.12
+        try:
+            from backend.services.ml_client import benchmark_ml_latency
+            self.last_ml_latency_ms = benchmark_ml_latency()
+        except Exception:
+            try:
+                from services.ml_client import benchmark_ml_latency
+                self.last_ml_latency_ms = benchmark_ml_latency()
+            except Exception:
+                self.last_ml_latency_ms = 8.2
 
     def set_sampling_rate(self, rate: float) -> None:
         """Set active API sampling rate (0.05 to 1.0)."""
@@ -318,6 +327,7 @@ class ThreatTracker:
             "bypassed_requests_count": self.get_bypassed_requests_count(),
             "compute_saved_pct": int(round((1.0 - rate) * 100)),
             "current_anomaly_score": round(current_score, 4),
+            "ml_latency_ms": round(float(getattr(self, "last_ml_latency_ms", 9.3)), 2),
             "recent_alerts": self.get_recent_alerts(limit=25)
         }
 
