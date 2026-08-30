@@ -137,10 +137,12 @@ python attacker.py
 - **Custom Attack Payload Lab:** Red-Team simulation bench for testing SQLi, XSS, and custom payloads against target gateway endpoints.
 - **Split-Screen War Room Dashboard:** Next.js operator control panel featuring live ML Latency indicator (~9.3ms), ML Anomaly Index Gauge, and Enterprise Defense Ticker.
 
-
+Backend Startup
 cd /home/mad-hunter/Documents/Programs/Tigmaminds/backend
 source venv/bin/activate
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+Frontend Startup
 
 cd /home/mad-hunter/Documents/Programs/Tigmaminds/frontend
 npm run dev
